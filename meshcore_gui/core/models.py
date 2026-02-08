@@ -51,6 +51,29 @@ class Message:
     path_hashes: List[str] = field(default_factory=list)
     message_hash: str = ""
 
+    @staticmethod
+    def from_dict(d: dict) -> "Message":
+        """Create a Message from an archive dictionary.
+
+        Args:
+            d: Dictionary as stored by MessageArchive.
+
+        Returns:
+            Message dataclass instance.
+        """
+        return Message(
+            time=d.get("time", ""),
+            sender=d.get("sender", ""),
+            text=d.get("text", ""),
+            channel=d.get("channel"),
+            direction=d.get("direction", "in"),
+            snr=d.get("snr"),
+            path_len=d.get("path_len", 0),
+            sender_pubkey=d.get("sender_pubkey", ""),
+            path_hashes=d.get("path_hashes", []),
+            message_hash=d.get("message_hash", ""),
+        )
+
 
 # ---------------------------------------------------------------------------
 # Contact
@@ -137,6 +160,7 @@ class RxLogEntry:
         rssi:         Received signal strength (dBm).
         payload_type: Packet type identifier.
         hops:         Number of hops (path_len from frame header).
+        message_hash: Optional message hash for correlation with messages.
     """
 
     time: str
@@ -144,6 +168,7 @@ class RxLogEntry:
     rssi: float = 0.0
     payload_type: str = "?"
     hops: int = 0
+    message_hash: str = ""
 
 
 # ---------------------------------------------------------------------------

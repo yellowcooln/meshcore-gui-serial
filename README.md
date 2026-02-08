@@ -28,6 +28,8 @@ Under the hood it uses `bleak` for Bluetooth Low Energy (which talks to BlueZ on
 - **Direct Messages** — Click on a contact to send a DM
 - **Message Filtering** — Filter messages per channel via checkboxes
 - **Message Route Visualization** — Click any message to open a detailed route page showing the path (hops) through the mesh network on an interactive map, with a hop summary, route table and reply panel
+- **Message Archive** — All messages and RX log entries are persisted to disk with configurable retention. Browse archived messages via the archive viewer with filters (channel, time range, text search), pagination and inline route tables
+<!-- ADDED: Message Archive feature was missing from features list -->
 - **Keyword Bot** — Built-in auto-reply bot that responds to configurable keywords on selected channels, with cooldown and loop prevention
 - **Packet Decoding** — Raw LoRa packets from RX log are decoded and decrypted using channel keys, providing message hashes, path hashes and hop data
 - **Message Deduplication** — Dual-strategy dedup (hash-based and content-based) prevents duplicate messages from appearing
@@ -187,6 +189,10 @@ The GUI opens automatically in your browser at `http://localhost:8080`
 | `DEBUG` | `meshcore_gui/config.py` | Set to `True` for verbose logging (or use `--debug-on`) |
 | `CHANNELS_CONFIG` | `meshcore_gui/config.py` | List of channels (hardcoded due to BLE timing issues) |
 | `CONTACT_REFRESH_SECONDS` | `meshcore_gui/config.py` | Interval between periodic contact refreshes (default: 300s / 5 minutes) |
+| `MESSAGE_RETENTION_DAYS` | `meshcore_gui/config.py` | Retention period for archived messages (default: 30 days) |
+| `RXLOG_RETENTION_DAYS` | `meshcore_gui/config.py` | Retention period for archived RX log entries (default: 7 days) |
+| `CONTACT_RETENTION_DAYS` | `meshcore_gui/config.py` | Retention period for cached contacts (default: 90 days) |
+<!-- ADDED: Three retention settings above were missing from config table -->
 | `KEY_RETRY_INTERVAL` | `meshcore_gui/ble/worker.py` | Interval between background retry attempts for missing channel keys (default: 30s) |
 | `BOT_CHANNELS` | `meshcore_gui/services/bot.py` | Channel indices the bot listens on |
 | `BOT_NAME` | `meshcore_gui/services/bot.py` | Display name prepended to bot replies |
@@ -231,6 +237,22 @@ Click on any message in the messages list to open a route page in a new tab. The
 Route data is resolved from two sources (in priority order):
 1. **RX log packet decode** — Path hashes extracted from the raw LoRa packet via `meshcoredecoder`
 2. **Contact out_path** — Stored route from the sender's contact record (fallback)
+
+<!-- ADDED: Message Archive section was missing from Functionality -->
+### Message Archive
+
+All incoming messages and RX log entries are automatically persisted to disk in `~/.meshcore-gui/archive/`. One JSON file per data type per BLE device address.
+
+Click the **📚 Archive** button in the Messages panel header to open the archive viewer in a new tab. The archive viewer provides:
+
+- **Pagination** — 50 messages per page, with Previous/Next navigation
+- **Channel filter** — Filter by specific channel or view all
+- **Time range filter** — Last 24 hours, 7 days, 30 days, 90 days, or all time
+- **Text search** — Case-insensitive search in message text
+- **Inline route tables** — Expandable route display per message (sender, repeaters, receiver with names and IDs)
+- **Reply from archive** — Expandable reply panel per message with pre-filled @sender mention
+
+Old data is automatically cleaned up based on configurable retention periods (`MESSAGE_RETENTION_DAYS`, `RXLOG_RETENTION_DAYS` in `config.py`).
 
 ### Local Cache
 
@@ -285,6 +307,8 @@ The built-in bot automatically replies to messages containing recognised keyword
 
 ## Architecture
 
+<!-- CHANGED: Architecture diagram updated — added MessageArchive component -->
+
 ```
 ┌─────────────────┐     ┌─────────────────┐
 │   Main Thread   │     │   BLE Thread    │
@@ -303,15 +327,22 @@ The built-in bot automatically replies to messages containing recognised keyword
 │  ┌─────┴─────┐  │  │  │   ┌────┴────┐   │
 │  │  Panels   │  │  │  │   │   Bot   │   │
 │  │  RoutePage│  │  │  │   │  Dedup  │   │
-│  └───────────┘  │  │  │   │  Cache  │   │
-└─────────────────┘  │  │   └─────────┘   │
-                     │  └─────────────────┘
+│  │ ArchivePg │  │  │  │   │  Cache  │   │
+│  └───────────┘  │  │  │   └─────────┘   │
+└─────────────────┘  │  └─────────────────┘
               ┌──────┴──────┐
               │ SharedData  │     ┌───────────────┐
               │ (thread-    │     │ DeviceCache   │
               │  safe)      │     │ (~/.meshcore- │
-              └─────────────┘     │  gui/cache/)  │
-                                  └───────────────┘
+              └──────┬──────┘     │  gui/cache/)  │
+                     │            └───────────────┘
+              ┌──────┴──────┐
+              │ Message     │
+              │ Archive     │
+              │ (~/.meshcore│
+              │ -gui/       │
+              │  archive/)  │
+              └─────────────┘
 ```
 
 - **BLEWorker**: Runs in separate thread with its own asyncio loop, with background retry for missing channel keys
@@ -321,9 +352,13 @@ The built-in bot automatically replies to messages containing recognised keyword
 - **MeshBot**: Keyword-triggered auto-reply on configured channels
 - **DualDeduplicator**: Prevents duplicate messages (hash-based + content-based)
 - **DeviceCache**: Local JSON cache per device for instant startup and offline resilience
+- **MessageArchive**: Persistent storage for messages and RX log with configurable retention and automatic cleanup
+<!-- ADDED: MessageArchive component description -->
 - **SharedData**: Thread-safe data sharing between BLE and GUI via Protocol interfaces
 - **DashboardPage**: Main GUI with modular panels (device, contacts, map, messages, etc.)
 - **RoutePage**: Standalone route visualization page opened per message
+- **ArchivePage**: Archive viewer with filters, pagination and inline route tables
+<!-- ADDED: ArchivePage component description -->
 - **Communication**: Via command queue (GUI→BLE) and shared state with flags (BLE→GUI)
 
 ## Known Limitations
@@ -331,6 +366,8 @@ The built-in bot automatically replies to messages containing recognised keyword
 1. **Channels hardcoded** — The `get_channel()` function in meshcore-py is unreliable via BLE (mitigated by background retry and disk caching of channel keys)
 2. **BLE command unreliability** — `send_appstart()`, `send_device_query()` and `get_channel()` can all fail intermittently. The application uses aggressive retries (10 attempts for device info, background retry every 30s for channel keys) and disk caching to compensate
 3. **Initial load time** — GUI waits for BLE data before the first render is complete (mitigated by cache: if cached data exists, the GUI populates instantly)
+4. **Archive route visualization** — Route data for archived messages depends on contacts currently in memory; archived-only messages without recent contact data may show incomplete routes
+<!-- ADDED: Archive-related limitation -->
 
 ## Troubleshooting
 
@@ -408,13 +445,15 @@ Or set `DEBUG = True` in `meshcore_gui/config.py`.
 
 ### Project structure
 
+<!-- CHANGED: Project structure updated — added archive_page.py and message_archive.py -->
+
 ```
 meshcore-gui/
 ├── meshcore_gui.py                  # Entry point
 ├── meshcore_gui/                    # Application package
 │   ├── __init__.py
 │   ├── __main__.py                  # Alternative entry: python -m meshcore_gui
-│   ├── config.py                    # DEBUG flag, channel configuration, refresh interval
+│   ├── config.py                    # DEBUG flag, channel configuration, refresh interval, retention settings
 │   ├── ble/                         # BLE communication layer
 │   │   ├── __init__.py
 │   │   ├── worker.py                # BLE thread, connection lifecycle, cache-first startup, background key retry
@@ -423,7 +462,7 @@ meshcore-gui/
 │   │   └── packet_decoder.py        # Raw LoRa packet decoding via meshcoredecoder
 │   ├── core/                        # Domain models and shared state
 │   │   ├── __init__.py
-│   │   ├── models.py                # Dataclasses: Message, Contact, RouteNode, etc.
+│   │   ├── models.py                # Dataclasses: Message, Contact, DeviceInfo, RxLogEntry, RouteNode
 │   │   ├── shared_data.py           # Thread-safe shared data store
 │   │   └── protocols.py             # Protocol interfaces (ISP/DIP)
 │   ├── gui/                         # NiceGUI web interface
@@ -431,6 +470,7 @@ meshcore-gui/
 │   │   ├── constants.py             # UI display constants
 │   │   ├── dashboard.py             # Main dashboard page orchestrator
 │   │   ├── route_page.py            # Message route visualization page
+│   │   ├── archive_page.py          # Message archive viewer with filters and pagination
 │   │   └── panels/                  # Modular UI panels
 │   │       ├── __init__.py
 │   │       ├── device_panel.py      # Device info display
@@ -438,7 +478,7 @@ meshcore-gui/
 │   │       ├── map_panel.py         # Leaflet map
 │   │       ├── input_panel.py       # Message input and channel select
 │   │       ├── filter_panel.py      # Channel filters and bot toggle
-│   │       ├── messages_panel.py    # Filtered message display
+│   │       ├── messages_panel.py    # Filtered message display with archive button
 │   │       ├── actions_panel.py     # Refresh and advert buttons
 │   │       └── rxlog_panel.py       # RX log table
 │   └── services/                    # Business logic
@@ -446,6 +486,7 @@ meshcore-gui/
 │       ├── bot.py                   # Keyword-triggered auto-reply bot
 │       ├── cache.py                 # Local JSON cache per BLE device
 │       ├── dedup.py                 # Message deduplication
+│       ├── message_archive.py       # Persistent message and RX log archive
 │       └── route_builder.py         # Route data construction
 ├── docs/
 │   ├── TROUBLESHOOTING.md           # BLE troubleshooting guide (Linux)
@@ -455,6 +496,7 @@ meshcore-gui/
 ├── .gitattributes
 ├── .gitignore
 ├── LICENSE
+├── CHANGELOG.md
 └── README.md
 ```
 
