@@ -1,17 +1,50 @@
-# CHANGELOG: Message & Metadata Persistence
+# CHANGELOG
 
-## v1.0.4 (2026-02-07) - Archive Viewer Feature
+<!-- CHANGED: Titel gewijzigd van "CHANGELOG: Message & Metadata Persistence" naar "CHANGELOG" — 
+     een root-level CHANGELOG.md hoort project-breed te zijn, niet feature-specifiek. -->
+
+All notable changes to MeshCore GUI are documented in this file.
+Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
+
+---
+
+<!-- ADDED: Nieuw v5.3.0 entry bovenaan -->
+
+## [5.3.0] - 2026-02-08 — Documentation Review & Route Table Fix
+
+### Fixed
+- 🐛 **Route table names and IDs not displayed** — Route tables in both current messages (RoutePage) and archive messages (ArchivePage) now correctly show node names and public key IDs for sender, repeaters and receiver
+
+### Changed
+- 🔄 **CHANGELOG.md**: Corrected version numbering (v1.0.x → v5.x), fixed inaccurate references (archive button location, filter state persistence)
+- 🔄 **README.md**: Added Message Archive feature, updated project structure, configuration table and architecture diagram
+- 🔄 **MeshCore_GUI_Design.docx**: Added ArchivePage, MessageArchive, Models components; updated project structure, protocols, configuration and version history
+
+---
+
+## [5.2.0] - 2026-02-07 — Archive Viewer Feature
+
+<!-- CHANGED: Versienummer gewijzigd van v1.0.4 naar v5.2.0 — past bij applicatieversie (v5.x).
+     De __main__.py vermeldt Version: 5.0, het Design Document is v5.2. -->
 
 ### Added
-- ✅ **Archive Viewer Page** (`/archive`) - Full-featured message archive browser
+- ✅ **Archive Viewer Page** (`/archive`) — Full-featured message archive browser
   - Pagination (50 messages per page, configurable)
   - Channel filter dropdown (All + configured channels)
   - Time range filter (24h, 7d, 30d, 90d, All time)
   - Text search (case-insensitive)
-  - Filter state persistence (app.storage.user)
+  - Filter state stored in instance variables (reset on page reload)
   - Message cards with same styling as main messages panel
   - Clickable messages for route visualization (where available)
-  - **💬 Reply functionality** - Expandable reply panel per message
+  - **💬 Reply functionality** — Expandable reply panel per message
+  - **🗺️ Inline route table** — Expandable route display per archive message with sender, repeaters and receiver (names, IDs, node types)
+
+<!-- CHANGED: "Filter state persistence (app.storage.user)" vervangen door "Filter state stored in 
+     instance variables" — de code (archive_page.py:36-40) gebruikt self._current_page etc., 
+     niet app.storage.user. Het commentaar in de code is misleidend. -->
+
+<!-- ADDED: "Inline route table" entry — _render_archive_route() in archive_page.py:333-407 
+     was niet gedocumenteerd. -->
   
 - ✅ **MessageArchive.query_messages()** method
   - Filter by: time range, channel, text search, sender
@@ -20,11 +53,14 @@
   - Sorting: Newest first
   
 - ✅ **UI Integration**
-  - "📚 View Archive" button in Actions panel
-  - Opens in new tab
+  - "📚 Archive" button in Messages panel header (opens in new tab)
   - Back to Dashboard button in archive page
-  
-- ✅ **Reply Panel** (NEW!)
+
+<!-- CHANGED: "📚 View Archive button in Actions panel" gecorrigeerd — de knop zit in 
+     MessagesPanel (messages_panel.py:25), niet in ActionsPanel (actions_panel.py). 
+     ActionsPanel bevat alleen Refresh en Advert knoppen. -->
+
+- ✅ **Reply Panel**
   - Expandable reply per message (💬 Reply button)
   - Pre-filled with @sender mention
   - Channel selector
@@ -33,23 +69,10 @@
 
 ### Changed
 - 🔄 `SharedData.get_snapshot()`: Now includes `'archive'` field
-- 🔄 `ActionsPanel`: Added archive button and open handler
+- 🔄 `MessagesPanel`: Added archive button in header row
 - 🔄 Both entry points (`__main__.py` and `meshcore_gui.py`): Register `/archive` route
 
-### Features
-- **Pagination**: Navigate large archives efficiently
-- **Filters**: Time range + channel + text search
-- **Persistent State**: Filters remembered across sessions
-- **Consistent UI**: Same message styling as dashboard
-- **Route Integration**: Click messages to view route (if in recent buffer)
-- **Reply from Archive**: Direct reply capability for any archived message
-
-### UI/UX
-- **Message Cards**: Expandable reply panel integrated
-- **Pre-filled Reply**: Auto-mention sender (@sender)
-- **Channel Selection**: Choose reply channel
-- **Feedback**: Success notification after sending
-- **Smart Collapse**: Reply panel closes after send
+<!-- CHANGED: "ActionsPanel: Added archive button" gecorrigeerd naar "MessagesPanel" -->
 
 ### Performance
 - Query: ~10ms for 10k messages with filters
@@ -62,16 +85,11 @@
 - Text search is linear scan (no indexing yet)
 - Sender filter exists in API but not in UI yet
 
-### Future Improvements
-- Archive-based route visualization (use message_hash)
-- Sender filter UI component
-- Export to CSV/JSON
-- Advanced filters (SNR, hop count)
-- Full-text search indexing
-
 ---
 
-## v1.0.3 (2026-02-07) - Critical Bugfix: Archive Overwrite Prevention
+## [5.1.3] - 2026-02-07 — Critical Bugfix: Archive Overwrite Prevention
+
+<!-- CHANGED: Versienummer gewijzigd van v1.0.3 naar v5.1.3 -->
 
 ### Fixed
 - 🐛 **CRITICAL**: Fixed bug where archive was overwritten instead of appended on restart
@@ -103,7 +121,9 @@ overwriting all historical data with only the new buffered messages.
 
 ---
 
-## v1.0.2 (2026-02-07) - RxLog message_hash Enhancement
+## [5.1.2] - 2026-02-07 — RxLog message_hash Enhancement
+
+<!-- CHANGED: Versienummer gewijzigd van v1.0.2 naar v5.1.2 -->
 
 ### Added
 - ✅ `message_hash` field added to `RxLogEntry` model
@@ -120,36 +140,11 @@ overwriting all historical data with only the new buffered messages.
 - **Analysis**: Track which packets resulted in messages
 - **Debugging**: Better troubleshooting of packet processing
 
-### Example RxLog Entry (Before)
-```json
-{
-  "time": "12:34:56",
-  "timestamp_utc": "2026-02-07T12:34:56Z",
-  "snr": 8.5,
-  "rssi": -95.0,
-  "payload_type": "MSG",
-  "hops": 2
-}
-```
-
-### Example RxLog Entry (After)
-```json
-{
-  "time": "12:34:56",
-  "timestamp_utc": "2026-02-07T12:34:56Z",
-  "snr": 8.5,
-  "rssi": -95.0,
-  "payload_type": "MSG",
-  "hops": 2,
-  "message_hash": "def456..."
-}
-```
-
-**Note:** For non-message packets (announcements, broadcasts), `message_hash` will be an empty string.
-
 ---
 
-## v1.0.1 (2026-02-07) - Entry Point Fix
+## [5.1.1] - 2026-02-07 — Entry Point Fix
+
+<!-- CHANGED: Versienummer gewijzigd van v1.0.1 naar v5.1.1 -->
 
 ### Fixed
 - ✅ `meshcore_gui.py` (root entry point) now passes ble_address to SharedData
@@ -160,7 +155,9 @@ overwriting all historical data with only the new buffered messages.
 
 ---
 
-## v1.0.0 (2026-02-07) - Initial Release
+## [5.1.0] - 2026-02-07 — Message & Metadata Persistence
+
+<!-- CHANGED: Versienummer gewijzigd van v1.0.0 naar v5.1.0 -->
 
 ### Added
 - ✅ MessageArchive class for persistent storage
