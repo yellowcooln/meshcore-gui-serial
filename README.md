@@ -53,7 +53,7 @@ Under the hood it uses `bleak` for Bluetooth Low Energy (which talks to BlueZ on
 
 ## Screenshots
 
-<img width="1628" height="844" alt="Screenshot from 2026-02-08 21-43-29" src="https://github.com/user-attachments/assets/1246f899-9d3a-4750-90cb-b5b26a4493d9" />
+<img width="1476" height="1168" alt="Screenshot from 2026-02-13 15-56-40" src="https://github.com/user-attachments/assets/3e969de7-0ed8-42c5-b90b-1b378e416c2e" />
 <img width="681" height="820" alt="Screenshot from 2026-02-05 12-23-24" src="https://github.com/user-attachments/assets/c8fba47a-470d-4c21-8ac2-48547bfeae3e" />
 <img width="1601" height="1020" alt="Screenshot from 2026-02-08 21-45-32" src="https://github.com/user-attachments/assets/65e4588c-4340-46e5-a649-b01b9019e7bf" />
 
