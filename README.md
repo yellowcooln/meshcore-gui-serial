@@ -206,10 +206,10 @@ Install the application on your headless device (e.g. a Raspberry Pi) following 
 ```bash
 cd ~/meshcore-gui
 source venv/bin/activate
-nohup python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on > ~/meshcore.log 2>&1 &
+nohup python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on > /dev/null 2>&1 &
 ```
 
-`nohup` keeps the application running after you close your SSH session. Output is redirected to `~/meshcore.log`.
+`nohup` keeps the application running after you close your SSH session. Debug output is automatically written to a rotating log file at `~/.meshcore-gui/logs/meshcore_gui.log` (max 20 MB, rotates automatically). No separate log file redirection is needed.
 
 ### Accessing the interface
 
