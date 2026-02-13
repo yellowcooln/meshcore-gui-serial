@@ -1,10 +1,33 @@
 # CHANGELOG
 
-<!-- CHANGED: Titel gewijzigd van "CHANGELOG: Message & Metadata Persistence" naar "CHANGELOG" — 
-     een root-level CHANGELOG.md hoort project-breed te zijn, niet feature-specifiek. -->
+<!-- CHANGED: Title changed from "CHANGELOG: Message & Metadata Persistence" to "CHANGELOG" — 
+     a root-level CHANGELOG.md should be project-wide, not feature-specific. -->
 
 All notable changes to MeshCore GUI are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Versioning](https://semver.org/).
+
+---
+
+## [5.8.0] - 2026-02-13 — Dashboard Layout Consolidation
+
+### Changed
+- 🔄 **Messages panel consolidated** — Filter checkboxes (DM + channels) and message input (text field, channel selector, Send button) are now integrated into the Messages panel, replacing the separate Filter and Input panels
+  - DM + channel checkboxes displayed centered in the Messages header row, between the "💬 Messages" label and the "📚 Archive" button
+  - Message input row (text field, channel selector, Send button) placed below the message list within the same card
+  - `messages_panel.py`: Constructor now accepts `put_command` callable; added `update_filters(data)`, `update_channel_options(channels)` methods and `channel_filters`, `last_channels` properties (all logic 1:1 from FilterPanel/InputPanel); `update()` signature unchanged
+- 🔄 **Actions panel expanded** — BOT toggle checkbox moved from Filter panel to Actions panel, below the Refresh/Advert buttons
+  - `actions_panel.py`: Constructor now accepts `set_bot_enabled` callable; added `update(data)` method for BOT state sync; `_on_bot_toggle()` logic 1:1 from FilterPanel
+- 🔄 **Dashboard layout simplified** — Centre column reduced from 4 panels (Map → Input → Filter → Messages) to 2 panels (Map → Messages)
+  - `dashboard.py`: FilterPanel and InputPanel no longer rendered; all dependencies rerouted to MessagesPanel and ActionsPanel; `_update_ui()` call-sites updated accordingly
+
+### Removed (from layout, files retained)
+- ❌ **Filter panel** no longer rendered as separate panel — `filter_panel.py` retained in codebase but not instantiated in dashboard
+- ❌ **Input panel** no longer rendered as separate panel — `input_panel.py` retained in codebase but not instantiated in dashboard
+
+### Impact
+- Cleaner, more compact dashboard: 2 fewer panels in the centre column
+- All functionality preserved — message filtering, send, BOT toggle, archive all work identically
+- No breaking changes to BLE, services, core or other panels
 
 ---
 
@@ -16,7 +39,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 - ✅ **Room Server panel** — Dedicated per-room-server message panel in the centre column below Messages. Each Room Server (type=3 contact) gets its own `ui.card()` with login/logout controls and message display
   - Click a Room Server contact to open an add/login dialog with password field
   - After login: messages are displayed in the room card; send messages directly from the room panel
-  - Password-rij + login-knop automatically replaced by Logout button after successful login
+  - Password row + login button automatically replaced by Logout button after successful login
   - Room Server author attribution via `signature` field (txt_type=2) — real message author is resolved from the 4-byte pubkey prefix, not the room server pubkey
   - New panel: `gui/panels/room_server_panel.py` — per-room card management with login state tracking
 - ✅ **Room Server password store** — Passwords stored outside the repository in `~/.meshcore-gui/room_passwords/<ADDRESS>.json`
@@ -104,7 +127,7 @@ pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/
 
 ---
 
-<!-- ADDED: Nieuw v5.5.0 entry bovenaan -->
+<!-- ADDED: New v5.5.0 entry at top -->
 
 ## [5.5.0] - 2026-02-08 — Bot Device Name Management
 
@@ -130,21 +153,21 @@ pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/
 ## [5.4.0] - 2026-02-08 — Contact Maintenance Feature
 
 ### Added
-- ✅ **Pin/Unpin contacts** (Iteratie A) — Toggle to pin individual contacts, protecting them from bulk deletion
+- ✅ **Pin/Unpin contacts** (Iteration A) — Toggle to pin individual contacts, protecting them from bulk deletion
   - Persistent pin state stored in `~/.meshcore-gui/cache/<ADDRESS>_pins.json`
   - Pinned contacts visually marked with yellow background
   - Pinned contacts sorted to top of contact list
   - Pin state survives app restart
   - New service: `services/pin_store.py` — JSON-backed persistent pin storage
 
-- ✅ **Bulk delete unpinned contacts** (Iteratie B) — Remove all unpinned contacts from device in one action
+- ✅ **Bulk delete unpinned contacts** (Iteration B) — Remove all unpinned contacts from device in one action
   - "🧹 Clean up" button in contacts panel with confirmation dialog
   - Shows count of contacts to be removed vs. pinned contacts kept
   - Progress status updates during removal
   - Automatic device resync after completion
   - New service: `services/contact_cleaner.py` — ContactCleanerService with purge statistics
 
-- ✅ **Auto-add contacts toggle** (Iteratie C) — Control whether device automatically adds new contacts from mesh adverts
+- ✅ **Auto-add contacts toggle** (Iteration C) — Control whether device automatically adds new contacts from mesh adverts
   - "📥 Auto-add" checkbox in contacts panel (next to Clean up button)
   - Syncs with device via `set_manual_add_contacts()` SDK call
   - Inverted logic handled internally (UI "Auto-add ON" = `set_manual_add_contacts(false)`)
@@ -173,8 +196,8 @@ pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/
 
 ## [5.2.0] - 2026-02-07 — Archive Viewer Feature
 
-<!-- CHANGED: Versienummer gewijzigd van v1.0.4 naar v5.2.0 — past bij applicatieversie (v5.x).
-     De __main__.py vermeldt Version: 5.0, het Design Document is v5.2. -->
+<!-- CHANGED: Version number changed from v1.0.4 to v5.2.0 — matches application version (v5.x).
+     __main__.py states Version: 5.0, the Design Document is v5.2. -->
 
 ### Added
 - ✅ **Archive Viewer Page** (`/archive`) — Full-featured message archive browser
@@ -188,12 +211,12 @@ pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/
   - **💬 Reply functionality** — Expandable reply panel per message
   - **🗺️ Inline route table** — Expandable route display per archive message with sender, repeaters and receiver (names, IDs, node types)
 
-<!-- CHANGED: "Filter state persistence (app.storage.user)" vervangen door "Filter state stored in 
-     instance variables" — de code (archive_page.py:36-40) gebruikt self._current_page etc., 
-     niet app.storage.user. Het commentaar in de code is misleidend. -->
+<!-- CHANGED: "Filter state persistence (app.storage.user)" replaced with "Filter state stored in 
+     instance variables" — the code (archive_page.py:36-40) uses self._current_page etc., 
+     not app.storage.user. The comment in the code is misleading. -->
 
 <!-- ADDED: "Inline route table" entry — _render_archive_route() in archive_page.py:333-407 
-     was niet gedocumenteerd. -->
+     was not documented. -->
   
 - ✅ **MessageArchive.query_messages()** method
   - Filter by: time range, channel, text search, sender
@@ -205,9 +228,9 @@ pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/
   - "📚 Archive" button in Messages panel header (opens in new tab)
   - Back to Dashboard button in archive page
 
-<!-- CHANGED: "📚 View Archive button in Actions panel" gecorrigeerd — de knop zit in 
-     MessagesPanel (messages_panel.py:25), niet in ActionsPanel (actions_panel.py). 
-     ActionsPanel bevat alleen Refresh en Advert knoppen. -->
+<!-- CHANGED: "📚 View Archive button in Actions panel" corrected — the button is in 
+     MessagesPanel (messages_panel.py:25), not in ActionsPanel (actions_panel.py). 
+     ActionsPanel only contains Refresh and Advert buttons. -->
 
 - ✅ **Reply Panel**
   - Expandable reply per message (💬 Reply button)
@@ -221,7 +244,7 @@ pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/
 - 🔄 `MessagesPanel`: Added archive button in header row
 - 🔄 Both entry points (`__main__.py` and `meshcore_gui.py`): Register `/archive` route
 
-<!-- CHANGED: "ActionsPanel: Added archive button" gecorrigeerd naar "MessagesPanel" -->
+<!-- CHANGED: "ActionsPanel: Added archive button" corrected to "MessagesPanel" -->
 
 ### Performance
 - Query: ~10ms for 10k messages with filters
@@ -238,7 +261,7 @@ pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/
 
 ## [5.1.3] - 2026-02-07 — Critical Bugfix: Archive Overwrite Prevention
 
-<!-- CHANGED: Versienummer gewijzigd van v1.0.3 naar v5.1.3 -->
+<!-- CHANGED: Version number changed from v1.0.3 to v5.1.3 -->
 
 ### Fixed
 - 🛠 **CRITICAL**: Fixed bug where archive was overwritten instead of appended on restart
@@ -272,7 +295,7 @@ overwriting all historical data with only the new buffered messages.
 
 ## [5.1.2] - 2026-02-07 — RxLog message_hash Enhancement
 
-<!-- CHANGED: Versienummer gewijzigd van v1.0.2 naar v5.1.2 -->
+<!-- CHANGED: Version number changed from v1.0.2 to v5.1.2 -->
 
 ### Added
 - ✅ `message_hash` field added to `RxLogEntry` model
@@ -293,7 +316,7 @@ overwriting all historical data with only the new buffered messages.
 
 ## [5.1.1] - 2026-02-07 — Entry Point Fix
 
-<!-- CHANGED: Versienummer gewijzigd van v1.0.1 naar v5.1.1 -->
+<!-- CHANGED: Version number changed from v1.0.1 to v5.1.1 -->
 
 ### Fixed
 - ✅ `meshcore_gui.py` (root entry point) now passes ble_address to SharedData
@@ -306,7 +329,7 @@ overwriting all historical data with only the new buffered messages.
 
 ## [5.1.0] - 2026-02-07 — Message & Metadata Persistence
 
-<!-- CHANGED: Versienummer gewijzigd van v1.0.0 naar v5.1.0 -->
+<!-- CHANGED: Version number changed from v1.0.0 to v5.1.0 -->
 
 ### Added
 - ✅ MessageArchive class for persistent storage
