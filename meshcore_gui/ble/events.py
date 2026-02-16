@@ -61,7 +61,7 @@ class EventHandler:
 
         Returns:
             List of display names (same length as *path_hashes*).
-            Unknown hashes become ``'0x<HH>'``.
+            Unknown hashes become their uppercase hex value.
         """
         names = []
         for h in path_hashes:
@@ -70,11 +70,11 @@ class EventHandler:
                 continue
             name = self._shared.get_contact_name_by_prefix(h)
             # get_contact_name_by_prefix returns h[:8] as fallback,
-            # normalise to '0x<HH>' for 2-char hashes.
+            # normalise to uppercase hex for 2-char hashes.
             if name and name != h[:8]:
                 names.append(name)
             else:
-                names.append(f'0x{h.upper()}')
+                names.append(h.upper())
         return names
 
     # ------------------------------------------------------------------
@@ -94,12 +94,30 @@ class EventHandler:
         
         # Try to decode payload to get message_hash
         message_hash = ""
+        rx_path_hashes: list = []
+        rx_path_names: list = []
+        rx_sender: str = ""
+        rx_receiver: str = self._shared.get_device_name() or ""
         payload_hex = payload.get('payload', '')
         if payload_hex:
             decoded = self._decoder.decode(payload_hex)
             if decoded is not None:
                 message_hash = decoded.message_hash
                 payload_type = self._decoder.get_payload_type_text(decoded.payload_type)
+
+                # Capture path info for all packet types
+                if decoded.path_hashes:
+                    rx_path_hashes = decoded.path_hashes
+                    rx_path_names = self._resolve_path_names(decoded.path_hashes)
+
+                # Use decoded path_length (from packet body) — more
+                # reliable than the frame-header path_len which can be 0.
+                if decoded.path_length:
+                    hops = decoded.path_length
+
+                # Capture sender name when available (GroupText only)
+                if decoded.sender:
+                    rx_sender = decoded.sender
 
                 # Cache path_hashes for correlation with on_channel_msg
                 if decoded.path_hashes and message_hash:
@@ -123,7 +141,6 @@ class EventHandler:
                             sender_pubkey, _contact = match
 
                     snr_msg = self._extract_snr(payload)
-                    path_names = self._resolve_path_names(decoded.path_hashes)
 
                     self._shared.add_message(Message.incoming(
                         decoded.sender,
@@ -134,7 +151,7 @@ class EventHandler:
                         path_len=decoded.path_length,
                         sender_pubkey=sender_pubkey,
                         path_hashes=decoded.path_hashes,
-                        path_names=path_names,
+                        path_names=rx_path_names,
                         message_hash=decoded.message_hash,
                     ))
 
@@ -142,7 +159,7 @@ class EventHandler:
                         f"RX_LOG → message: hash={decoded.message_hash}, "
                         f"sender={decoded.sender!r}, ch={decoded.channel_idx}, "
                         f"path={decoded.path_hashes}, "
-                        f"path_names={path_names}"
+                        f"path_names={rx_path_names}"
                     )
 
                     self._bot.check_and_reply(
@@ -154,7 +171,7 @@ class EventHandler:
                         path_hashes=decoded.path_hashes,
                     )
         
-        # Add RX log entry with message_hash (if available)
+        # Add RX log entry with message_hash and path info (if available)
         self._shared.add_rx_log(RxLogEntry(
             time=time_str,
             snr=snr,
@@ -162,6 +179,10 @@ class EventHandler:
             payload_type=payload_type,
             hops=hops,
             message_hash=message_hash,
+            path_hashes=rx_path_hashes,
+            path_names=rx_path_names,
+            sender=rx_sender,
+            receiver=rx_receiver,
         ))
 
     # ------------------------------------------------------------------

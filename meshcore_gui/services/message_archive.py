@@ -164,6 +164,10 @@ class MessageArchive:
                 "payload_type": entry.payload_type,
                 "hops": entry.hops,
                 "message_hash": entry.message_hash,
+                "path_hashes": entry.path_hashes,
+                "path_names": entry.path_names,
+                "sender": entry.sender,
+                "receiver": entry.receiver,
             }
             
             self._rxlog_buffer.append(entry_dict)

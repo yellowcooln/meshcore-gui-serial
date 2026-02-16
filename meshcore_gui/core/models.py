@@ -296,6 +296,8 @@ class RxLogEntry:
         payload_type: Packet type identifier.
         hops:         Number of hops (path_len from frame header).
         message_hash: Optional message hash for correlation with messages.
+        path_hashes:  2-char hex repeater hashes from decoded packet.
+        path_names:   Resolved display names for each path hash.
     """
 
     time: str
@@ -304,6 +306,10 @@ class RxLogEntry:
     payload_type: str = "?"
     hops: int = 0
     message_hash: str = ""
+    path_hashes: List[str] = field(default_factory=list)
+    path_names: List[str] = field(default_factory=list)
+    sender: str = ""
+    receiver: str = ""
 
 
 # ---------------------------------------------------------------------------

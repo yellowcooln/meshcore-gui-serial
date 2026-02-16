@@ -8,6 +8,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.9.5] - 2026-02-16 — Layout Fix: RX Log Table Responsive Sizing
+
+### Fixed
+- 🛠 **RX Log table did not adapt to panel/card size** — The table used `max-h-48` (a maximum height cap) instead of a responsive fixed height, causing it to remain small regardless of available space. Changed to `h-40` which is overridden by the existing dashboard CSS to `calc(100vh - 20rem)` — the same responsive pattern used by the Messages panel
+- 🛠 **RX Log table did not fill card width** — Added `w-full` class to the table element so it stretches to the full width of the parent card
+- 🛠 **RX Log card did not fill panel height** — Added `flex-grow` class to the card container so it expands to fill the available panel space
+
+### Changed
+- 🔄 `gui/panels/rxlog_panel.py`: Card classes `'w-full'` → `'w-full flex-grow'` (line 45); table classes `'text-xs max-h-48 overflow-y-auto'` → `'w-full text-xs h-40 overflow-y-auto'` (line 65)
+
+### Impact
+- RX Log table now fills the panel consistently on both desktop and mobile viewports
+- Layout is consistent with other panels (Messages, Contacts) that use the same `h-40` responsive height pattern
+- No functional changes — all event handlers, callbacks, data bindings, logica and imports are identical to the input
+
+---
+
 ## [1.9.4] - 2026-02-16 — BLE Address Log Prefix & Entry Point Cleanup
 
 ### Added
