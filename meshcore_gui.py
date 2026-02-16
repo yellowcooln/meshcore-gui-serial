@@ -130,6 +130,7 @@ def main():
     ssl_certfile = None
 
     if ssl_enabled:
+        import socket
         import subprocess
         from pathlib import Path
         ssl_dir = config.DATA_DIR / 'ssl'
@@ -138,7 +139,18 @@ def main():
         ssl_certfile = str(ssl_dir / 'cert.pem')
 
         if not (ssl_dir / 'cert.pem').exists():
-            print("Generating self-signed SSL certificate ...")
+            # Detect local IP for SAN (Subject Alternative Name)
+            local_ip = '127.0.0.1'
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(('8.8.8.8', 80))
+                local_ip = s.getsockname()[0]
+                s.close()
+            except Exception:
+                pass
+
+            san = f"DNS:localhost,IP:127.0.0.1,IP:{local_ip}"
+            print(f"Generating self-signed SSL certificate (SAN: {san}) ...")
             subprocess.run([
                 'openssl', 'req', '-x509',
                 '-newkey', 'rsa:2048',
@@ -147,6 +159,7 @@ def main():
                 '-days', '3650',
                 '-nodes',
                 '-subj', '/CN=DOMCA MeshCore GUI',
+                '-addext', f'subjectAltName={san}',
             ], check=True, capture_output=True)
             print(f"Certificate saved to {ssl_dir}/")
         else:
