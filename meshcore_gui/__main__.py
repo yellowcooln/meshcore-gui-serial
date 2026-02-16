@@ -11,6 +11,7 @@ Usage:
     python meshcore_gui.py <BLE_ADDRESS> --debug-on
     python meshcore_gui.py <BLE_ADDRESS> --port=9090
     python meshcore_gui.py <BLE_ADDRESS> --ble-pin=000000
+    python meshcore_gui.py <BLE_ADDRESS> --ssl
     python -m meshcore_gui <BLE_ADDRESS>
 
                    Author: PE1HVH
@@ -86,16 +87,18 @@ def main():
     if not args:
         print("MeshCore GUI - Threaded BLE Edition")
         print("=" * 40)
-        print("Usage: python meshcore_gui.py <BLE_ADDRESS> [--debug-on] [--port=PORT] [--ble-pin=PIN]")
+        print("Usage: python meshcore_gui.py <BLE_ADDRESS> [--debug-on] [--port=PORT] [--ble-pin=PIN] [--ssl]")
         print("Example: python meshcore_gui.py literal:AA:BB:CC:DD:EE:FF")
         print("         python meshcore_gui.py literal:AA:BB:CC:DD:EE:FF --debug-on")
         print("         python meshcore_gui.py literal:AA:BB:CC:DD:EE:FF --port=9090")
         print("         python meshcore_gui.py literal:AA:BB:CC:DD:EE:FF --ble-pin=000000")
+        print("         python meshcore_gui.py literal:AA:BB:CC:DD:EE:FF --ssl")
         print()
         print("Options:")
         print("  --debug-on        Enable verbose debug logging")
         print("  --port=PORT       Web server port (default: 8081)")
         print("  --ble-pin=PIN     BLE pairing PIN (default: 123456)")
+        print("  --ssl             Enable HTTPS with auto-generated self-signed certificate")
         print()
         print("Tip: Use 'bluetoothctl scan on' to find devices")
         sys.exit(1)
@@ -122,6 +125,34 @@ def main():
         if flag.startswith('--ble-pin='):
             config.BLE_PIN = flag.split('=', 1)[1]
 
+    # Apply --ssl flag (auto-generate self-signed certificate if needed)
+    ssl_enabled = '--ssl' in flags
+    ssl_keyfile = None
+    ssl_certfile = None
+
+    if ssl_enabled:
+        import subprocess
+        from pathlib import Path
+        ssl_dir = config.DATA_DIR / 'ssl'
+        ssl_dir.mkdir(parents=True, exist_ok=True)
+        ssl_keyfile = str(ssl_dir / 'key.pem')
+        ssl_certfile = str(ssl_dir / 'cert.pem')
+
+        if not (ssl_dir / 'cert.pem').exists():
+            print("Generating self-signed SSL certificate ...")
+            subprocess.run([
+                'openssl', 'req', '-x509',
+                '-newkey', 'rsa:2048',
+                '-keyout', ssl_keyfile,
+                '-out', ssl_certfile,
+                '-days', '3650',
+                '-nodes',
+                '-subj', '/CN=DOMCA MeshCore GUI',
+            ], check=True, capture_output=True)
+            print(f"Certificate saved to {ssl_dir}/")
+        else:
+            print(f"Using existing certificate from {ssl_dir}/")
+
     # Startup banner
     print("=" * 50)
     print("MeshCore GUI - Threaded BLE Edition")
@@ -129,6 +160,7 @@ def main():
     print(f"Device:     {ble_address}")
     print(f"Port:       {port}")
     print(f"BLE PIN:    {config.BLE_PIN}")
+    print(f"SSL:        {'ON (https)' if ssl_enabled else 'OFF (http)'}")
     print(f"Debug mode: {'ON' if config.DEBUG else 'OFF'}")
     print("=" * 50)
 
@@ -151,7 +183,14 @@ def main():
         app.add_static_files('/static', str(static_dir))
 
     # Start NiceGUI server (blocks)
-    ui.run(show=False, host='0.0.0.0', title='DOMCA MeshCore', port=port, reload=False, storage_secret='meshcore-gui-secret')
+    run_kwargs = dict(
+        show=False, host='0.0.0.0', title='DOMCA MeshCore',
+        port=port, reload=False, storage_secret='meshcore-gui-secret',
+    )
+    if ssl_enabled:
+        run_kwargs['ssl_keyfile'] = ssl_keyfile
+        run_kwargs['ssl_certfile'] = ssl_certfile
+    ui.run(**run_kwargs)
 
 
 if __name__ == "__main__":
