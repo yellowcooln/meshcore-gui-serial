@@ -16,8 +16,7 @@ from typing import Dict, List, Optional
 from nicegui import ui
 
 from meshcore_gui.gui.constants import TYPE_LABELS
-from meshcore_gui.gui.dashboard import _DOMCA_HEAD
-from meshcore_gui.config import debug_print
+from meshcore_gui.config import debug_print, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM
 from meshcore_gui.core.models import Message, RouteNode
 from meshcore_gui.services.route_builder import RouteBuilder
 from meshcore_gui.core.protocols import SharedDataReadAndLookup
@@ -80,18 +79,12 @@ class RoutePage:
         route = self._builder.build(msg, data)
 
         ui.page_title(f'Route — {msg.sender or "Unknown"}')
-        ui.add_head_html(_DOMCA_HEAD)
-        ui.dark_mode(True)
+        ui.dark_mode(False)
 
-        with ui.header().classes('items-center px-4 py-2 shadow-md'):
-            ui.label('🗺️ MeshCore Route').classes('text-lg font-bold')
-            ui.space()
-            ui.button(
-                icon='close',
-                on_click=lambda: ui.run_javascript('window.close()'),
-            ).props('flat round dense color=white').tooltip('Close tab')
+        with ui.header().classes('bg-blue-600 text-white'):
+            ui.label('🗺️ MeshCore Route').classes('text-xl font-bold')
 
-        with ui.column().classes('domca-panel gap-4 p-4'):
+        with ui.column().classes('w-full max-w-4xl mx-auto p-4 gap-4'):
             self._render_message_info(msg)
             self._render_hop_summary(msg, route)
             self._render_map(data, route)
@@ -169,12 +162,12 @@ class RoutePage:
                 ).classes('text-gray-500 italic p-4')
                 return
 
-            center_lat = data['adv_lat'] or 52.5
-            center_lon = data['adv_lon'] or 6.0
+            center_lat = data['adv_lat'] or DEFAULT_MAP_CENTER[0]
+            center_lon = data['adv_lon'] or DEFAULT_MAP_CENTER[1]
 
             route_map = ui.leaflet(
-                center=(center_lat, center_lon), zoom=10
-            ).classes('w-full').style('height: calc(100vh - 32rem); min-height: 10rem')
+                center=(center_lat, center_lon), zoom=DEFAULT_MAP_ZOOM
+            ).classes('w-full h-96')
 
             # Build ordered list of positions (or None)
             ordered = []
@@ -201,7 +194,7 @@ class RoutePage:
             if len(all_points) >= 2:
                 route_map.generic_layer(
                     name='polyline',
-                    args=[all_points, {'color': '#48CAE4', 'weight': 3}],
+                    args=[all_points, {'color': '#2563eb', 'weight': 3}],
                 )
 
             if all_points:
@@ -345,4 +338,5 @@ class RoutePage:
                         })
                         inp.value = ''
 
-                ui.button('Send', on_click=send).props('color=cyan-8')
+                ui.button('Send', on_click=send).classes('bg-blue-500 text-white')
+

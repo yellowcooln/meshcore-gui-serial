@@ -8,6 +8,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.9.4] - 2026-02-16 — BLE Address Log Prefix & Entry Point Cleanup
+
+### Added
+- ✅ **BLE address prefix in log filename** — Log file is now named `<BLE_ADDRESS>_meshcore_gui.log` (e.g. `AA_BB_CC_DD_EE_FF_meshcore_gui.log`) instead of the generic `meshcore_gui.log`. Makes it easy to identify which device produced which log file when running multiple instances
+  - New helper `_sanitize_ble_address()` strips `literal:` prefix and replaces colons with underscores
+  - New function `configure_log_file(ble_address)` updates `LOG_FILE` at runtime before the logger is initialised
+  - Rotated backups follow the same naming pattern automatically
+
+### Removed
+- ❌ **`meshcore_gui/meshcore_gui.py`** — Redundant copy of `main()` that was never imported. All three entry points (`meshcore_gui.py` root, `__main__.py`, and `meshcore_gui/meshcore_gui.py`) contained near-identical copies of the same logic, causing changes to be missed (as demonstrated by this fix). `__main__.py` is now the single source of truth; root `meshcore_gui.py` is a thin wrapper that imports from it
+
+### Changed
+- 🔄 `config.py`: Added `_sanitize_ble_address()` and `configure_log_file()`; version bumped to `1.9.4`
+- 🔄 `__main__.py`: Added `config.configure_log_file(ble_address)` call before any debug output
+- 🔄 `meshcore_gui.py` (root): Reduced to 4-line wrapper importing `main` from `__main__`
+
+### Impact
+- Log files are now identifiable per BLE device
+- Single source of truth for `main()` eliminates future sync issues between entry points
+- Both startup methods (`python meshcore_gui.py` and `python -m meshcore_gui`) remain functional
+- No breaking changes — defaults and all existing behaviour unchanged
+---
+
+## [1.9.3] - 2026-02-16 — Bugfix: Map Default Location & Payload Type Decoding
+
+### Fixed
+- 🛠 **Map centred on hardcoded Zwolle instead of device location** — All Leaflet maps used magic-number coordinates `(52.5, 6.0)` as initial centre and fallback. These are now replaced by a single configurable constant `DEFAULT_MAP_CENTER` in `config.py`. Once the device reports a valid `adv_lat`/`adv_lon`, maps re-centre on the actual device position (existing behaviour, unchanged)
+- 🛠 **Payload type shown as raw integer** — Payload type is now retrieved from the decoded payload and translated to human-readable text using MeshCoreDecoder functions, instead of displaying the raw numeric type value
+
+### Changed
+- 🔄 `config.py`: Added `DEFAULT_MAP_CENTER` (default: `(52.5168, 6.0830)`) and `DEFAULT_MAP_ZOOM` (default: `9`) constants in new **MAP DEFAULTS** section. Version bumped to `1.9.2`
+- 🔄 `gui/panels/map_panel.py`: Imports `DEFAULT_MAP_CENTER` and `DEFAULT_MAP_ZOOM` from config; `ui.leaflet(center=...)` uses config constants instead of hardcoded values
+- 🔄 `gui/route_page.py`: Imports `DEFAULT_MAP_CENTER` and `DEFAULT_MAP_ZOOM` from config; fallback coordinates (`or 52.5` / `or 6.0`) replaced by `DEFAULT_MAP_CENTER[0]` / `[1]`; zoom uses `DEFAULT_MAP_ZOOM`
+
+### Impact
+- Map default location is now a single-point-of-change in `config.py`
+- Payload type is displayed as readable text instead of a raw number
+- No breaking changes — all existing map behaviour (re-centre on device position, contact markers) unchanged
+
 ## [1.9.2] - 2026-02-15 — CLI Parameters & Cleanup
 
 ### Added

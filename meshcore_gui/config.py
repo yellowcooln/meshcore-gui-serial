@@ -24,7 +24,24 @@ from typing import Any, Dict, List
 # VERSION
 # ==============================================================================
 
-VERSION: str = "1.9.2"
+VERSION: str = "1.9.4"
+
+
+# ==============================================================================
+# MAP DEFAULTS
+# ==============================================================================
+
+# Default map centre used as the initial view *before* the device reports
+# its own GPS position.  Once the device advertises a valid adv_lat/adv_lon
+# pair, every map will re-centre on the device's actual location.
+#
+# Change these values to match the location of your device / station.
+# Current default: Zwolle, The Netherlands (52.5168, 6.0830).
+DEFAULT_MAP_CENTER: tuple[float, float] = (52.5168, 6.0830)
+
+# Default zoom level for all Leaflet maps (higher = more zoomed in).
+DEFAULT_MAP_ZOOM: int = 9
+
 
 
 # ==============================================================================
@@ -287,7 +304,6 @@ RECONNECT_BASE_DELAY: float = 5.0
 # only present in cache are kept so offline nodes are preserved).
 CONTACT_REFRESH_SECONDS: float = 300.0  # 5 minutes
 
-
 # ==============================================================================
 # EXTERNAL LINKS (drawer menu)
 # ==============================================================================
@@ -298,8 +314,6 @@ EXT_LINKS = [
     ('Netwerk kaart', 'https://meshcore.co.uk/map'),
     ('LocalMesh NL',  'https://www.localmesh.nl/'),
 ]
-
-
 # ==============================================================================
 # ARCHIVE / RETENTION
 # ==============================================================================
@@ -315,3 +329,4 @@ RXLOG_RETENTION_DAYS: int = 7
 # Retention period for contacts (in days).
 # Contacts not seen for longer than this are removed from cache.
 CONTACT_RETENTION_DAYS: int = 90
+

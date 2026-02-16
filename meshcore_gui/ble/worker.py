@@ -47,6 +47,7 @@ from typing import Dict, List, Optional, Set
 
 from meshcore import MeshCore, EventType
 
+import meshcore_gui.config as _config
 from meshcore_gui.config import (
     BLE_DEFAULT_TIMEOUT,
     BLE_LIB_DEBUG,
@@ -59,7 +60,6 @@ from meshcore_gui.config import (
     debug_print,
     pp,
 )
-import meshcore_gui.config as _config
 from meshcore_gui.core.protocols import SharedDataWriter
 from meshcore_gui.ble.ble_agent import BleAgentManager
 from meshcore_gui.ble.ble_reconnect import reconnect_loop, remove_bond
@@ -866,3 +866,4 @@ class BLEWorker:
             
         except Exception as exc:
             debug_print(f"Periodic cleanup failed: {exc}")
+
