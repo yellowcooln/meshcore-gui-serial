@@ -160,7 +160,11 @@ class Message:
 
     # -- Display formatting ----------------------------------------------
 
-    def format_line(self, channel_names: Optional[Dict[int, str]] = None) -> str:
+    def format_line(
+        self,
+        channel_names: Optional[Dict[int, str]] = None,
+        show_channel: bool = True,
+    ) -> str:
         """Format as a single display line for the messages panel.
 
         Produces the same output as the original ``messages_panel.py``
@@ -168,34 +172,42 @@ class Message:
 
             12:34:56 ← [Public] [2h✓] PE1ABC: Hello mesh!
 
+        When *show_channel* is ``False`` the ``[channel]`` / ``[DM]``
+        tag is omitted (useful when the panel header already indicates
+        the active channel).
+
         Args:
             channel_names: Optional ``{channel_idx: name}`` lookup.
                 Falls back to ``self.channel_name``, then ``'ch<idx>'``.
+            show_channel: Include ``[channel]`` / ``[DM]`` prefix.
+                Defaults to ``True`` for backward compatibility.
 
         Returns:
             Formatted single-line string.
         """
         direction = '→' if self.direction == 'out' else '←'
 
-        if self.channel is not None:
-            if channel_names and self.channel in channel_names:
-                ch_name = channel_names[self.channel]
-            elif self.channel_name:
-                ch_name = self.channel_name
+        ch_label = ''
+        if show_channel:
+            if self.channel is not None:
+                if channel_names and self.channel in channel_names:
+                    ch_name = channel_names[self.channel]
+                elif self.channel_name:
+                    ch_name = self.channel_name
+                else:
+                    ch_name = f'ch{self.channel}'
+                ch_label = f'[{ch_name}] '
             else:
-                ch_name = f'ch{self.channel}'
-            ch_label = f'[{ch_name}]'
-        else:
-            ch_label = '[DM]'
+                ch_label = '[DM] '
 
         if self.direction == 'in' and self.path_len > 0:
-            hop_tag = f' [{self.path_len}h{"✓" if self.path_hashes else ""}]'
+            hop_tag = f'[{self.path_len}h{"✓" if self.path_hashes else ""}] '
         else:
             hop_tag = ''
 
         if self.sender:
-            return f"{self.time} {direction} {ch_label}{hop_tag} {self.sender}: {self.text}"
-        return f"{self.time} {direction} {ch_label}{hop_tag} {self.text}"
+            return f"{self.time} {direction} {ch_label}{hop_tag}{self.sender}: {self.text}"
+        return f"{self.time} {direction} {ch_label}{hop_tag}{self.text}"
 
 
 # ---------------------------------------------------------------------------

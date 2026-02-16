@@ -289,6 +289,18 @@ CONTACT_REFRESH_SECONDS: float = 300.0  # 5 minutes
 
 
 # ==============================================================================
+# EXTERNAL LINKS (drawer menu)
+# ==============================================================================
+
+EXT_LINKS = [
+    ('MeshCore',      'https://meshcore.co.uk'),
+    ('Handleiding',   'https://www.pe1hvh.nl/pdf/MeshCore_Complete_Handleiding.pdf'),
+    ('Netwerk kaart', 'https://meshcore.co.uk/map'),
+    ('LocalMesh NL',  'https://www.localmesh.nl/'),
+]
+
+
+# ==============================================================================
 # ARCHIVE / RETENTION
 # ==============================================================================
 

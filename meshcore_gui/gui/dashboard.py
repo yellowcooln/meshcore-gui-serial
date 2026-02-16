@@ -101,8 +101,8 @@ body.body--dark .q-card .text-red-400  { color: #f87171 !important; }
 /* ── Dark mode: message area, inputs, tables ── */
 body.body--dark .bg-gray-50  { background: #0c1a2e !important; color: #c0dce8 !important; }
 body.body--dark .bg-gray-100 { background: #152a45 !important; }
-body.body--dark .hover\:bg-gray-100:hover { background: #1a3352 !important; }
-body.body--dark .hover\:bg-blue-50:hover  { background: #0d2a4a !important; }
+body.body--dark .hover\\:bg-gray-100:hover { background: #1a3352 !important; }
+body.body--dark .hover\\:bg-blue-50:hover  { background: #0d2a4a !important; }
 body.body--dark .bg-yellow-50 { background: rgba(72,202,228,0.06) !important; }
 
 body.body--dark .q-field__control { background: #0c1a2e !important; color: #e0f0f8 !important; }
@@ -114,7 +114,7 @@ body.body--dark .q-table thead th { color: #48CAE4 !important; }
 body.body--dark .q-table tbody td { color: #c0dce8 !important; }
 
 body.body--dark .q-checkbox__label { color: #c0dce8 !important; }
-body.body--dark .q-btn--flat:not(.domca-menu-btn) { color: #48CAE4 !important; }
+body.body--dark .q-btn--flat:not(.domca-menu-btn):not(.domca-sub-btn) { color: #48CAE4 !important; }
 
 body.body--dark .q-separator { background: rgba(0,119,182,0.2) !important; }
 
@@ -130,6 +130,34 @@ body.body--light .domca-ext-link { color: #3d6380 !important; }
 /* ── DOMCA active menu item ── */
 body.body--dark .domca-menu-active  { color: #48CAE4 !important; background: rgba(72,202,228,0.1) !important; }
 body.body--light .domca-menu-active { color: #0077B6 !important; background: rgba(0,119,182,0.08) !important; }
+
+/* ── DOMCA submenu item styling ── */
+body.body--dark .domca-sub-btn        { color: #6a8fa8 !important; }
+body.body--dark .domca-sub-btn:hover  { color: #48CAE4 !important; }
+body.body--light .domca-sub-btn       { color: #5a7a90 !important; }
+body.body--light .domca-sub-btn:hover { color: #0077B6 !important; }
+
+/* ── DOMCA expansion panel in drawer ── */
+.domca-drawer .q-expansion-item {
+  font-family: 'JetBrains Mono', monospace !important;
+  letter-spacing: 2px;
+  font-size: 0.8rem;
+}
+.domca-drawer .q-expansion-item .q-item {
+  padding: 0.35rem 1.2rem !important;
+  min-height: 32px !important;
+}
+.domca-drawer .q-expansion-item .q-expansion-item__content {
+  padding: 0 !important;
+}
+.domca-drawer .q-expansion-item + .q-expansion-item {
+  margin-top: 0 !important;
+}
+body.body--dark .domca-drawer .q-expansion-item { color: #8badc4 !important; }
+body.body--dark .domca-drawer .q-expansion-item__container { background: transparent !important; }
+body.body--dark .domca-drawer .q-item { color: #8badc4 !important; }
+body.body--light .domca-drawer .q-expansion-item { color: #3d6380 !important; }
+body.body--light .domca-drawer .q-item { color: #3d6380 !important; }
 
 /* ── Landing page centering ── */
 .domca-landing {
@@ -163,7 +191,7 @@ body.body--light .domca-menu-active { color: #0077B6 !important; background: rgb
 body, .q-layout, .q-page {
   min-width: 0 !important;
 }
-.q-drawer { max-width: 85vw !important; }
+.q-drawer { max-width: 80vw !important; width: 260px !important; min-width: 200px !important; }
 
 /* ── Mobile optimisations ── */
 @media (max-width: 640px) {
@@ -259,25 +287,30 @@ _DOMCA_SVG = '''\
 </svg>'''
 
 
-# ── Menu definitions ─────────────────────────────────────────────────
+# ── Standalone menu items (no submenus) ──────────────────────────────
 
-_MENU_ITEMS = [
-    ('\U0001f4ac', 'MESSAGES', 'messages'),
-    ('\U0001f465', 'CONTACTS', 'contacts'),
+_STANDALONE_ITEMS = [
     ('\U0001f5fa\ufe0f', 'MAP',      'map'),
     ('\U0001f4e1', 'DEVICE',   'device'),
     ('\u26a1',     'ACTIONS',  'actions'),
     ('\U0001f4ca', 'RX LOG',   'rxlog'),
-    ('\U0001f3e0', 'ROOMS',    'rooms'),
-    ('\U0001f4da', 'ARCHIVE',  'archive'),
 ]
 
-_EXT_LINKS = [
-    ('MeshCore',      'https://meshcore.co.uk'),
-    ('Handleiding',   'https://www.pe1hvh.nl/pdf/MeshCore_Complete_Handleiding.pdf'),
-    ('Netwerk kaart', 'https://meshcore.co.uk/map'),
-    ('LocalMesh NL',  'https://www.localmesh.nl/'),
-]
+_EXT_LINKS = config.EXT_LINKS
+
+# ── Shared button styles ─────────────────────────────────────────────
+
+_SUB_BTN_STYLE = (
+    "font-family: 'JetBrains Mono', monospace; "
+    "letter-spacing: 1px; font-size: 0.72rem; "
+    "padding: 0.2rem 1.2rem 0.2rem 2.4rem"
+)
+
+_MENU_BTN_STYLE = (
+    "font-family: 'JetBrains Mono', monospace; "
+    "letter-spacing: 2px; font-size: 0.8rem; "
+    "padding: 0.35rem 1.2rem"
+)
 
 
 class DashboardPage:
@@ -313,6 +346,16 @@ class DashboardPage:
         self._drawer = None
         self._menu_buttons: dict = {}
 
+        # Submenu containers (for dynamic channel/room items)
+        self._msg_sub_container = None
+        self._archive_sub_container = None
+        self._rooms_sub_container = None
+        self._last_channel_fingerprint = None
+        self._last_rooms_fingerprint = None
+
+        # Archive page reference (for inline channel switching)
+        self._archive_page: ArchivePage | None = None
+
     # ------------------------------------------------------------------
     # Public
     # ------------------------------------------------------------------
@@ -343,30 +386,86 @@ class DashboardPage:
         ).style('padding: 0')
 
         with self._drawer:
-            # DOMCA branding
-            with ui.column().style('padding: 1.5rem 1.2rem 0'):
-                ui.label('DOMCA').style(
+            # Top row: X close button (same position as hamburger)
+            with ui.row().classes('w-full items-center').style(
+                'padding: 0.2rem 0.5rem 0'
+            ):
+                ui.button(
+                    icon='close',
+                    on_click=lambda: self._drawer.hide(),
+                ).props('flat round dense color=white')
+
+            # DOMCA branding (clickable → landing page)
+            with ui.column().style('padding: 0 1.2rem 0'):
+                ui.button(
+                    'DOMCA',
+                    on_click=lambda: self._show_panel('landing'),
+                ).props('flat no-caps').style(
                     "font-family: 'Exo 2', sans-serif; font-size: 1.4rem; "
                     "font-weight: 800; color: var(--title); letter-spacing: 4px; "
-                    "margin-bottom: 1rem"
+                    "margin-bottom: 0.3rem; padding: 0"
                 )
 
-            # Panel menu items
             self._menu_buttons = {}
-            for icon, label, panel_id in _MENU_ITEMS:
+
+            # ── 💬 MESSAGES (expandable with channel submenu) ──────
+            with ui.expansion(
+                '\U0001f4ac  MESSAGES', icon=None, value=False,
+            ).props('dense header-class="q-pa-none"').classes('w-full'):
+                self._msg_sub_container = ui.column().classes('w-full gap-0')
+                with self._msg_sub_container:
+                    self._make_sub_btn(
+                        'ALL', lambda: self._show_panel('messages', channel=None)
+                    )
+                    self._make_sub_btn(
+                        'DM', lambda: self._show_panel('messages', channel='DM')
+                    )
+                    # Dynamic channel items populated by _update_submenus
+
+            # ── 🏠 ROOMS (expandable with room submenu) ───────────
+            with ui.expansion(
+                '\U0001f3e0  ROOMS', icon=None, value=False,
+            ).props('dense header-class="q-pa-none"').classes('w-full'):
+                self._rooms_sub_container = ui.column().classes('w-full gap-0')
+                with self._rooms_sub_container:
+                    self._make_sub_btn(
+                        'ALL', lambda: self._show_panel('rooms')
+                    )
+                    # Pre-populate from persisted rooms
+                    for entry in self._room_password_store.get_rooms():
+                        short = entry.name or entry.pubkey[:12]
+                        self._make_sub_btn(
+                            f'\U0001f3e0 {short}',
+                            lambda: self._show_panel('rooms'),
+                        )
+
+            # ── 📚 ARCHIVE (expandable with channel submenu) ──────
+            with ui.expansion(
+                '\U0001f4da  ARCHIVE', icon=None, value=False,
+            ).props('dense header-class="q-pa-none"').classes('w-full'):
+                self._archive_sub_container = ui.column().classes('w-full gap-0')
+                with self._archive_sub_container:
+                    self._make_sub_btn(
+                        'ALL', lambda: self._show_panel('archive', channel=None)
+                    )
+                    self._make_sub_btn(
+                        'DM', lambda: self._show_panel('archive', channel='DM')
+                    )
+                    # Dynamic channel items populated by _update_submenus
+
+            ui.separator().classes('my-1')
+
+            # ── Standalone menu items (MAP, DEVICE, ACTIONS, RX LOG)
+            for icon, label, panel_id in _STANDALONE_ITEMS:
                 btn = ui.button(
                     f'{icon}  {label}',
                     on_click=lambda pid=panel_id: self._show_panel(pid),
                 ).props('flat no-caps align=left').classes(
                     'w-full justify-start domca-menu-btn'
-                ).style(
-                    "font-family: 'JetBrains Mono', monospace; "
-                    "letter-spacing: 2px; font-size: 0.8rem; "
-                    "padding: 0.55rem 1.2rem"
-                )
+                ).style(_MENU_BTN_STYLE)
                 self._menu_buttons[panel_id] = btn
 
-            ui.separator().classes('my-4')
+            ui.separator().classes('my-2')
 
             # External links (same as domca.nl navigation)
             with ui.column().style('padding: 0 1.2rem'):
@@ -442,8 +541,8 @@ class DashboardPage:
         archive_container = ui.column().classes('domca-panel')
         archive_container.set_visibility(False)
         with archive_container:
-            archive = ArchivePage(self._shared)
-            archive.render()
+            self._archive_page = ArchivePage(self._shared)
+            self._archive_page.render()
         self._panel_containers['archive'] = archive_container
 
         self._active_panel = 'landing'
@@ -452,16 +551,118 @@ class DashboardPage:
         ui.timer(0.5, self._update_ui)
 
     # ------------------------------------------------------------------
+    # Submenu button helper (layout only)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _make_sub_btn(label: str, on_click) -> ui.button:
+        """Create a submenu button in the drawer."""
+        return ui.button(
+            label,
+            on_click=on_click,
+        ).props('flat no-caps align=left').classes(
+            'w-full justify-start domca-sub-btn'
+        ).style(_SUB_BTN_STYLE)
+
+    # ------------------------------------------------------------------
+    # Dynamic submenu updates (layout — called from _update_ui)
+    # ------------------------------------------------------------------
+
+    def _update_submenus(self, data: dict) -> None:
+        """Rebuild channel/room submenu items when data changes.
+
+        Only the dynamic items are rebuilt; the container is cleared and
+        ALL items (static + dynamic) are re-rendered.
+        """
+        # ── Channel submenus (Messages + Archive) ──
+        channels = data.get('channels', [])
+        ch_fingerprint = tuple((ch['idx'], ch['name']) for ch in channels)
+
+        if ch_fingerprint != self._last_channel_fingerprint and channels:
+            self._last_channel_fingerprint = ch_fingerprint
+
+            # Rebuild Messages submenu
+            if self._msg_sub_container:
+                self._msg_sub_container.clear()
+                with self._msg_sub_container:
+                    self._make_sub_btn(
+                        'ALL', lambda: self._show_panel('messages', channel=None)
+                    )
+                    self._make_sub_btn(
+                        'DM', lambda: self._show_panel('messages', channel='DM')
+                    )
+                    for ch in channels:
+                        idx = ch['idx']
+                        name = ch['name']
+                        self._make_sub_btn(
+                            f"[{idx}] {name}",
+                            lambda i=idx: self._show_panel('messages', channel=i),
+                        )
+
+            # Rebuild Archive submenu
+            if self._archive_sub_container:
+                self._archive_sub_container.clear()
+                with self._archive_sub_container:
+                    self._make_sub_btn(
+                        'ALL', lambda: self._show_panel('archive', channel=None)
+                    )
+                    self._make_sub_btn(
+                        'DM', lambda: self._show_panel('archive', channel='DM')
+                    )
+                    for ch in channels:
+                        idx = ch['idx']
+                        name = ch['name']
+                        self._make_sub_btn(
+                            f"[{idx}] {name}",
+                            lambda n=name: self._show_panel('archive', channel=n),
+                        )
+
+        # ── Room submenus ──
+        rooms = self._room_password_store.get_rooms()
+        rooms_fingerprint = tuple((r.pubkey, r.name) for r in rooms)
+
+        if rooms_fingerprint != self._last_rooms_fingerprint:
+            self._last_rooms_fingerprint = rooms_fingerprint
+
+            if self._rooms_sub_container:
+                self._rooms_sub_container.clear()
+                with self._rooms_sub_container:
+                    self._make_sub_btn(
+                        'ALL', lambda: self._show_panel('rooms')
+                    )
+                    for entry in rooms:
+                        short = entry.name or entry.pubkey[:12]
+                        self._make_sub_btn(
+                            f'\U0001f3e0 {short}',
+                            lambda: self._show_panel('rooms'),
+                        )
+
+    # ------------------------------------------------------------------
     # Panel switching (layout helper — no functional logic)
     # ------------------------------------------------------------------
 
-    def _show_panel(self, panel_id: str) -> None:
-        """Show the selected panel, hide all others, close the drawer."""
+    def _show_panel(self, panel_id: str, channel=None) -> None:
+        """Show the selected panel, hide all others, close the drawer.
+
+        Args:
+            panel_id: Panel to show (e.g. 'messages', 'archive', 'rooms').
+            channel:  Optional channel filter.
+                      For messages: None=all, 'DM'=DM only, int=channel idx.
+                      For archive:  None=all, 'DM'=DM only, str=channel name.
+        """
         for pid, container in self._panel_containers.items():
             container.set_visibility(pid == panel_id)
         self._active_panel = panel_id
 
-        # Update active menu highlight
+        # Apply channel filter to messages panel
+        if panel_id == 'messages' and self._messages:
+            self._messages.set_active_channel(channel)
+
+        # Apply channel filter to archive panel
+        if panel_id == 'archive' and self._archive_page:
+            self._archive_page.set_channel_filter(channel)
+
+        # Update active menu highlight (standalone buttons only)
         for pid, btn in self._menu_buttons.items():
             if pid == panel_id:
                 btn.classes('domca-menu-active', remove='')
@@ -540,6 +741,10 @@ class DashboardPage:
             # RX Log
             if data['rxlog_updated']:
                 self._rxlog.update(data)
+
+            # Update dynamic drawer submenus (channels + rooms)
+            if data['channels_updated'] or is_first:
+                self._update_submenus(data)
 
             # Clear flags
             self._shared.clear_update_flags()
