@@ -16,6 +16,7 @@ from typing import Dict, List, Optional
 from nicegui import ui
 
 from meshcore_gui.gui.constants import TYPE_LABELS
+from meshcore_gui.gui.dashboard import _DOMCA_HEAD
 from meshcore_gui.config import debug_print, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM
 from meshcore_gui.core.models import Message, RouteNode
 from meshcore_gui.services.route_builder import RouteBuilder
@@ -79,12 +80,22 @@ class RoutePage:
         route = self._builder.build(msg, data)
 
         ui.page_title(f'Route — {msg.sender or "Unknown"}')
-        ui.dark_mode(False)
 
-        with ui.header().classes('bg-blue-600 text-white'):
-            ui.label('🗺️ MeshCore Route').classes('text-xl font-bold')
+        # DOMCA theme (consistent with dashboard)
+        ui.add_head_html(_DOMCA_HEAD)
+        ui.dark_mode(True)
 
-        with ui.column().classes('w-full max-w-4xl mx-auto p-4 gap-4'):
+        with ui.header().classes('items-center px-4 py-2 shadow-md'):
+            ui.label('🗺️ MeshCore Route').classes(
+                'text-lg font-bold domca-header-text'
+            ).style("font-family: 'JetBrains Mono', monospace")
+            ui.space()
+            ui.button(
+                icon='close',
+                on_click=lambda: ui.run_javascript('window.close()'),
+            ).props('flat round dense color=white').tooltip('Close')
+
+        with ui.column().classes('domca-panel gap-4').style('padding-top: 1rem'):
             self._render_message_info(msg)
             self._render_hop_summary(msg, route)
             self._render_map(data, route)
@@ -228,14 +239,32 @@ class RoutePage:
                     'role': '📱 Sender',
                 })
             else:
-                rows.append({
-                    'hop': 'Start',
-                    'name': msg.sender or 'Unknown',
-                    'hash': msg.sender_pubkey[:2].upper() if msg.sender_pubkey else '-',
-                    'type': '-',
-                    'location': '-',
-                    'role': '📱 Sender',
-                })
+                # Defensive fallback: try to find contact in snapshot
+                fallback_contact = RoutePage._find_sender_contact(
+                    msg, data.get('contacts', {}),
+                )
+                if fallback_contact:
+                    fb_key, fb_c = fallback_contact
+                    fb_lat = fb_c.get('adv_lat', 0)
+                    fb_lon = fb_c.get('adv_lon', 0)
+                    fb_has_loc = fb_lat != 0 or fb_lon != 0
+                    rows.append({
+                        'hop': 'Start',
+                        'name': fb_c.get('adv_name') or msg.sender or 'Unknown',
+                        'hash': fb_key[:2].upper() if fb_key else '-',
+                        'type': TYPE_LABELS.get(fb_c.get('type', 0), '-'),
+                        'location': f"{fb_lat:.4f}, {fb_lon:.4f}" if fb_has_loc else '-',
+                        'role': '📱 Sender',
+                    })
+                else:
+                    rows.append({
+                        'hop': 'Start',
+                        'name': msg.sender or 'Unknown',
+                        'hash': msg.sender_pubkey[:2].upper() if msg.sender_pubkey else '-',
+                        'type': '-',
+                        'location': '-',
+                        'role': '📱 Sender',
+                    })
 
             # Repeaters
             for i, node in enumerate(path_nodes):
@@ -339,4 +368,43 @@ class RoutePage:
                         inp.value = ''
 
                 ui.button('Send', on_click=send).classes('bg-blue-500 text-white')
+
+    # ------------------------------------------------------------------
+    # Private — helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _find_sender_contact(
+        msg: Message, contacts: Dict,
+    ) -> Optional[tuple]:
+        """Defensive fallback: find sender contact data in snapshot.
+
+        Tries pubkey-based bidirectional prefix match first, then
+        falls back to name-based lookup.  Used by ``_render_route_table``
+        when ``RouteBuilder`` could not resolve the sender.
+
+        Args:
+            msg:      Message to find the sender for.
+            contacts: Contact dict from the data snapshot.
+
+        Returns:
+            ``(pubkey, contact_dict)`` tuple or ``None``.
+        """
+        # Strategy 1: pubkey prefix match
+        if msg.sender_pubkey:
+            pk_lower = msg.sender_pubkey.lower()
+            for key, contact in contacts.items():
+                key_lower = key.lower()
+                if key_lower.startswith(pk_lower) or pk_lower.startswith(key_lower):
+                    return (key, contact)
+
+        # Strategy 2: name match
+        if msg.sender:
+            name_lower = msg.sender.lower()
+            for key, contact in contacts.items():
+                adv_name = contact.get('adv_name', '')
+                if adv_name and adv_name.lower() == name_lower:
+                    return (key, contact)
+
+        return None
 

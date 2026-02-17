@@ -8,6 +8,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.9.8] - 2026-02-17 — Bugfix: Route Page Sender ID, Type & Location Not Populated
+
+### Fixed
+- 🛠 **Sender ID, Type and Location empty in Route Page** — After the v4.1 refactoring to `RouteBuilder`/`RouteNode`, the sender contact lookup relied solely on `SharedData.get_contact_by_prefix()` (live lock-based) and `get_contact_by_name()`. When both failed (e.g. empty `sender_pubkey` from RX_LOG decode, or name mismatch), `route['sender']` remained `None` and the route table fell through to a hardcoded fallback with `type: '-'`, `location: '-'`. The contact data was available in the snapshot `data['contacts']` but was never searched
+- 🛠 **Route table fallback row ignored available contact data** — When `route['sender']` was `None`, the `_render_route_table` method used a static fallback row without attempting to find the contact in the data snapshot. Even when the contact was present in `data['contacts']` with valid type and location, these fields showed as `'-'`
+
+### Changed
+- 🔄 `services/route_builder.py`: Added two additional fallback strategies in `build()` after the existing SharedData lookups: (3) bidirectional pubkey prefix match against `data['contacts']` snapshot, (4) case-insensitive `adv_name` match against `data['contacts']` snapshot. Added helper methods `_find_contact_by_pubkey()` and `_find_contact_by_adv_name()` for snapshot-based lookups
+- 🔄 `gui/route_page.py`: Added defensive fallback in `_render_route_table()` sender section — when `route['sender']` is `None`, attempts to find the contact in the snapshot via `_find_sender_contact()` before falling back to the static `'-'` row. Added `_find_sender_contact()` helper method
+
+### Impact
+- Sender ID (hash), Type and Location are now populated correctly in the route table when the contact is known
+- Four-layer lookup chain ensures maximum resolution: (1) SharedData pubkey lookup, (2) SharedData name lookup, (3) snapshot pubkey lookup, (4) snapshot name lookup
+- Defensive fallback in route_page guarantees data is shown even if RouteBuilder misses it
+- No breaking changes — all existing route page behavior, styling and data flows unchanged
+
+---
+
+## [1.9.7] - 2026-02-17 — Layout Fix: Archive Filter Toggle & Route Page Styling
+
+### Changed
+- 🔄 `gui/archive_page.py`: Archive filter card now hidden by default; toggle visibility via a `filter_list` icon button placed right-aligned on the same row as the "📚 Archive" title. Header restructured from single label to `ui.row()` with `justify-between` layout
+- 🔄 `gui/route_page.py`: Route page now uses DOMCA theme (imported from `dashboard.py`) with dark mode as default, consistent with the main dashboard. Header restyled from `bg-blue-600` to Quasar-themed header with JetBrains Mono font. Content container changed from `w-full max-w-4xl mx-auto` to `domca-panel` class for consistent responsive sizing
+- 🔄 `gui/dashboard.py`: Added `domca-header-text` CSS class with `@media (max-width: 599px)` rule to hide header text on narrow viewports; applied to version label and status label
+- 🔄 `gui/route_page.py`: Header label also uses `domca-header-text` class for consistent responsive behaviour
+
+### Added
+- ✅ **Archive filter toggle** — `filter_list` icon button in archive header row toggles the filter card visibility on click
+- ✅ **Route page close button** — `X` (close) icon button added right-aligned in the route page header; calls `window.close()` to close the browser tab
+- ✅ **Responsive header** — On viewports < 600px, header text labels are hidden; only icon buttons (menu, dark mode toggle, close) remain visible
+
+### Impact
+- Archive page is cleaner by default — filters only shown when needed
+- Route page visually consistent with the main dashboard (DOMCA theme, dark mode, responsive panel width)
+- Headers degrade gracefully on mobile (< 600px): only icon buttons visible, no text overflow
+- No functional changes — all event handlers, callbacks, data bindings, logic and imports are identical to the input
+
+---
+
 ## [1.9.6] - 2026-02-17 — Bugfix: Channel Discovery Reliability
 
 ### Fixed

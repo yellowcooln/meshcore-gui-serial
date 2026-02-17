@@ -108,6 +108,45 @@ class RouteBuilder:
                         f"'{sender_name}' → pubkey={found_pubkey[:16]!r}"
                     )
 
+        # Fallback 3: direct lookup in snapshot contacts by pubkey
+        if result['sender'] is None and pubkey:
+            snapshot_contact = self._find_contact_by_pubkey(
+                pubkey, data['contacts'],
+            )
+            if snapshot_contact:
+                contact = snapshot_contact
+                result['sender'] = RouteNode(
+                    name=snapshot_contact.get('adv_name') or pubkey[:8],
+                    lat=snapshot_contact.get('adv_lat', 0),
+                    lon=snapshot_contact.get('adv_lon', 0),
+                    type=snapshot_contact.get('type', 0),
+                    pubkey=pubkey,
+                )
+                debug_print(
+                    f"Route build: snapshot pubkey fallback "
+                    f"→ {snapshot_contact.get('adv_name', '?')}"
+                )
+
+        # Fallback 4: direct lookup in snapshot contacts by name
+        if result['sender'] is None and msg.sender:
+            name_match = self._find_contact_by_adv_name(
+                msg.sender, data['contacts'],
+            )
+            if name_match:
+                found_pubkey, snapshot_contact = name_match
+                contact = snapshot_contact
+                result['sender'] = RouteNode(
+                    name=snapshot_contact.get('adv_name') or msg.sender,
+                    lat=snapshot_contact.get('adv_lat', 0),
+                    lon=snapshot_contact.get('adv_lon', 0),
+                    type=snapshot_contact.get('type', 0),
+                    pubkey=found_pubkey,
+                )
+                debug_print(
+                    f"Route build: snapshot name fallback "
+                    f"'{msg.sender}' → pubkey={found_pubkey[:16]!r}"
+                )
+
         # --- Resolve path nodes (priority order) ---
 
         # Priority 1: path_hashes from RX_LOG decode
@@ -229,4 +268,60 @@ class RouteBuilder:
         for pubkey, contact in contacts.items():
             if pubkey.lower().startswith(hash_hex):
                 return contact
+        return None
+
+    @staticmethod
+    def _find_contact_by_pubkey(
+        pubkey_prefix: str, contacts: Dict,
+    ) -> Optional[Dict]:
+        """Find a contact by full or partial pubkey (bidirectional prefix match).
+
+        Mirrors the matching logic of
+        :meth:`SharedData.get_contact_by_prefix` but operates on the
+        snapshot contacts dict directly, avoiding a lock acquisition.
+
+        Args:
+            pubkey_prefix: Full or partial public key (hex string).
+            contacts:      Contact dict from snapshot.
+
+        Returns:
+            Contact dict or ``None``.
+        """
+        if not pubkey_prefix:
+            return None
+        prefix_lower = pubkey_prefix.lower()
+        for key, contact in contacts.items():
+            key_lower = key.lower()
+            if key_lower.startswith(prefix_lower) or prefix_lower.startswith(key_lower):
+                return contact
+        return None
+
+    @staticmethod
+    def _find_contact_by_adv_name(
+        name: str, contacts: Dict,
+    ) -> Optional[tuple]:
+        """Find a contact by advertised name (case-insensitive).
+
+        Mirrors the matching logic of
+        :meth:`SharedData.get_contact_by_name` but operates on the
+        snapshot contacts dict directly.
+
+        Args:
+            name:     Display name to search for.
+            contacts: Contact dict from snapshot.
+
+        Returns:
+            ``(pubkey, contact_dict)`` tuple or ``None``.
+        """
+        if not name:
+            return None
+        name_lower = name.lower()
+        # Exact match first
+        for key, contact in contacts.items():
+            if contact.get('adv_name', '') == name:
+                return (key, contact)
+        # Case-insensitive fallback
+        for key, contact in contacts.items():
+            if contact.get('adv_name', '').lower() == name_lower:
+                return (key, contact)
         return None

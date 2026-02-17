@@ -219,6 +219,11 @@ body, .q-layout, .q-page {
   letter-spacing: 2px;
   opacity: 0.3;
 }
+
+/* ── Header text: icon-only on narrow viewports ── */
+@media (max-width: 599px) {
+  .domca-header-text { display: none !important; }
+}
 </style>
 '''
 
@@ -501,13 +506,13 @@ class DashboardPage:
             )
 
             ui.label(f'\U0001f517 MeshCore v{config.VERSION}').classes(
-                'text-lg font-bold ml-2'
+                'text-lg font-bold ml-2 domca-header-text'
             ).style("font-family: 'JetBrains Mono', monospace")
 
             ui.space()
 
             self._status_label = ui.label('Starting...').classes(
-                'text-sm opacity-70'
+                'text-sm opacity-70 domca-header-text'
             )
 
             ui.button(

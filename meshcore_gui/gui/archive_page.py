@@ -40,6 +40,7 @@ class ArchivePage:
 
         # UI references for inline refresh
         self._channel_label = None
+        self._filter_card = None
         self._msg_outer = None
         self._text_input = None
         self._days_select = None
@@ -75,11 +76,19 @@ class ArchivePage:
         with ui.column().classes('w-full p-4 gap-4').style(
             'height: calc(100vh - 5rem); overflow: hidden'
         ):
-            # Header with active channel label
-            self._channel_label = ui.label(
-                '\U0001f4da Archive — All'
-            ).classes('text-2xl font-bold')
-            
+            # Header row: channel label (left) + filter icon (right)
+            with ui.row().classes('w-full items-center justify-between'):
+                self._channel_label = ui.label(
+                    '\U0001f4da Archive — All'
+                ).classes('text-2xl font-bold')
+
+                ui.button(
+                    icon='filter_list',
+                    on_click=lambda: self._filter_card.set_visibility(
+                        not self._filter_card.visible
+                    ),
+                ).props('flat round dense').tooltip('Toggle filters')
+
             # Filters (days + text search — channel is driven by submenu)
             self._render_filters()
             
@@ -91,7 +100,9 @@ class ArchivePage:
     
     def _render_filters(self):
         """Render filter controls (days + text search only)."""
-        with ui.card().classes('w-full'):
+        self._filter_card = ui.card().classes('w-full')
+        self._filter_card.set_visibility(False)
+        with self._filter_card:
             ui.label('Filters').classes('text-lg font-bold mb-2')
             
             with ui.row().classes('w-full gap-4 items-end'):
