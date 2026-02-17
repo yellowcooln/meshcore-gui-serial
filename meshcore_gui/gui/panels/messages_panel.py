@@ -122,10 +122,16 @@ class MessagesPanel:
     # -- Channel selector (moved from InputPanel) ----------------------
 
     def update_channel_options(self, channels: List[Dict]) -> None:
-        """Update the channel dropdown options."""
+        """Update the channel dropdown options.
+
+        Includes an equality check to avoid sending redundant updates
+        to the NiceGUI client on every 500 ms timer tick.
+        """
         if not self._channel_select or not channels:
             return
         opts = {ch['idx']: f"[{ch['idx']}] {ch['name']}" for ch in channels}
+        if self._channel_select.options == opts:
+            return  # unchanged — skip DOM update
         self._channel_select.options = opts
         if self._channel_select.value not in opts:
             self._channel_select.value = list(opts.keys())[0]

@@ -426,47 +426,71 @@ class SharedData:
         instances (not dicts).
         """
         with self.lock:
-            d = self.device
-            return {
-                # DeviceInfo fields (flat for backward compat)
-                'name': d.name,
-                'public_key': d.public_key,
-                'radio_freq': d.radio_freq,
-                'radio_sf': d.radio_sf,
-                'radio_bw': d.radio_bw,
-                'tx_power': d.tx_power,
-                'adv_lat': d.adv_lat,
-                'adv_lon': d.adv_lon,
-                'firmware_version': d.firmware_version,
-                # Status
-                'connected': self.connected,
-                'status': self.status,
-                # Collections (typed copies)
-                'contacts': self.contacts.copy(),
-                'channels': self.channels.copy(),
-                'messages': self.messages.copy(),
-                'rx_log': self.rx_log.copy(),
-                # Flags
-                'device_updated': self.device_updated,
-                'contacts_updated': self.contacts_updated,
-                'channels_updated': self.channels_updated,
-                'rxlog_updated': self.rxlog_updated,
-                'gui_initialized': self.gui_initialized,
-                'bot_enabled': self.bot_enabled,
-                'auto_add_enabled': self.auto_add_enabled,
-                # Archive (for archive viewer)
-                'archive': self.archive,
-                # Room login states
-                'room_login_states': {
-                    k: v.copy()
-                    for k, v in self.room_login_states.items()
-                },
-                # Room message cache (archived + live)
-                'room_messages': {
-                    k: list(v)
-                    for k, v in self._room_msg_cache.items()
-                },
-            }
+            return self._build_snapshot_unlocked()
+
+    def get_snapshot_and_clear_flags(self) -> Dict:
+        """Atomically snapshot all data and reset update flags.
+
+        Combines ``get_snapshot()`` and ``clear_update_flags()`` in a
+        single lock acquisition.  This eliminates the race condition
+        where the BLE worker sets a flag between the two separate calls,
+        causing the GUI to miss an update (e.g. newly discovered
+        channels never appearing in the menu).
+
+        Returns:
+            Same dict structure as ``get_snapshot()``.
+        """
+        with self.lock:
+            snapshot = self._build_snapshot_unlocked()
+            self.device_updated = False
+            self.contacts_updated = False
+            self.channels_updated = False
+            self.rxlog_updated = False
+            return snapshot
+
+    def _build_snapshot_unlocked(self) -> Dict:
+        """Build the snapshot dict.  MUST be called with self.lock held."""
+        d = self.device
+        return {
+            # DeviceInfo fields (flat for backward compat)
+            'name': d.name,
+            'public_key': d.public_key,
+            'radio_freq': d.radio_freq,
+            'radio_sf': d.radio_sf,
+            'radio_bw': d.radio_bw,
+            'tx_power': d.tx_power,
+            'adv_lat': d.adv_lat,
+            'adv_lon': d.adv_lon,
+            'firmware_version': d.firmware_version,
+            # Status
+            'connected': self.connected,
+            'status': self.status,
+            # Collections (typed copies)
+            'contacts': self.contacts.copy(),
+            'channels': self.channels.copy(),
+            'messages': self.messages.copy(),
+            'rx_log': self.rx_log.copy(),
+            # Flags
+            'device_updated': self.device_updated,
+            'contacts_updated': self.contacts_updated,
+            'channels_updated': self.channels_updated,
+            'rxlog_updated': self.rxlog_updated,
+            'gui_initialized': self.gui_initialized,
+            'bot_enabled': self.bot_enabled,
+            'auto_add_enabled': self.auto_add_enabled,
+            # Archive (for archive viewer)
+            'archive': self.archive,
+            # Room login states
+            'room_login_states': {
+                k: v.copy()
+                for k, v in self.room_login_states.items()
+            },
+            # Room message cache (archived + live)
+            'room_messages': {
+                k: list(v)
+                for k, v in self._room_msg_cache.items()
+            },
+        }
 
     def clear_update_flags(self) -> None:
         with self.lock:

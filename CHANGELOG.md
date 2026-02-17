@@ -8,6 +8,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.9.6] - 2026-02-17 — Bugfix: Channel Discovery Reliability
+
+### Fixed
+- 🛠 **Channels not appearing (especially on mobile)** — Channel discovery aborted too early on slow BLE connections. The `_discover_channels()` probe used a single attempt per channel slot and stopped after just 2 consecutive empty responses. On mobile BLE stacks (WebBluetooth via NiceGUI) where GATT responses are slower, this caused discovery to abort before finding any channels, falling back to only `[0] Public`
+- 🛠 **Race condition: channel update flag lost between threads** — `get_snapshot()` and `clear_update_flags()` were two separate calls, each acquiring the lock independently. If the BLE worker set `channels_updated = True` between these two calls, the GUI consumed the flag via `get_snapshot()` but then `clear_update_flags()` reset it — causing the channel submenu and dropdown to never populate
+- 🛠 **Channels disappear on browser reconnect** — When a browser tab is closed and reopened, `render()` creates new (empty) NiceGUI containers for the drawer submenus, but did not reset `_last_channel_fingerprint`. The `_update_submenus()` method compared the new fingerprint against the stale one, found them equal, and skipped the rebuild — leaving the new containers permanently empty. Fixed by resetting both `_last_channel_fingerprint` and `_last_rooms_fingerprint` in `render()`
+
+### Changed
+- 🔄 `core/shared_data.py`: New atomic method `get_snapshot_and_clear_flags()` that reads the snapshot and resets all update flags in a single lock acquisition. Internally refactored to `_build_snapshot_unlocked()` helper. Existing `get_snapshot()` and `clear_update_flags()` retained for backward compatibility
+- 🔄 `ble/worker.py`: `_discover_channels()` — `max_attempts` increased from 1 to 2 per channel slot; inter-attempt `delay` increased from 0.5s to 1.0s; consecutive error threshold raised from 2 to 3; inter-channel pause increased from 0.15s to 0.3s for mobile BLE stack breathing room
+- 🔄 `gui/dashboard.py`: `_update_ui()` now uses `get_snapshot_and_clear_flags()` instead of separate `get_snapshot()` + `clear_update_flags()`; `render()` now resets `_last_channel_fingerprint` and `_last_rooms_fingerprint` to `None` so that `_update_submenus()` rebuilds into the freshly created containers; channel-dependent updates (`update_filters`, `update_channel_options`, `_update_submenus`) now run unconditionally when channel data exists — safe because each method has internal idempotency checks
+- 🔄 `gui/panels/messages_panel.py`: `update_channel_options()` now includes an equality check on options dict to skip redundant `.update()` calls to the NiceGUI client on every 500ms timer tick
+
+### Impact
+- Channel discovery now survives transient BLE timeouts that are common on mobile connections
+- Atomic snapshot eliminates the threading race condition that caused channels to silently never appear
+- Browser close+reopen no longer loses channels — the single-instance timer race on the shared `DashboardPage` is fully mitigated
+- No breaking changes — all existing API methods retained, all other functionality unchanged
+
+---
+
 ## [1.9.5] - 2026-02-16 — Layout Fix: RX Log Table Responsive Sizing
 
 ### Fixed

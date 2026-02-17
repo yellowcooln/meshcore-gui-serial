@@ -372,6 +372,12 @@ class DashboardPage:
         """Build the complete dashboard layout and start the timer."""
         self._initialized = False
 
+        # Reset fingerprints: render() creates new (empty) NiceGUI
+        # containers, so _update_submenus must rebuild into them even
+        # when the channel/room data hasn't changed since last session.
+        self._last_channel_fingerprint = None
+        self._last_rooms_fingerprint = None
+
         # Create panel instances (UNCHANGED functional wiring)
         put_cmd = self._shared.put_command
         self._device = DevicePanel()
@@ -694,7 +700,10 @@ class DashboardPage:
             if not self._status_label:
                 return
 
-            data = self._shared.get_snapshot()
+            # Atomic snapshot + flag clear: eliminates race condition
+            # where BLE worker sets channels_updated between separate
+            # get_snapshot() and clear_update_flags() calls.
+            data = self._shared.get_snapshot_and_clear_flags()
             is_first = not self._initialized
 
             # Mark initialised immediately — even if a panel update
@@ -710,10 +719,22 @@ class DashboardPage:
             if data['device_updated'] or is_first:
                 self._device.update(data)
 
-            # Channels → filter checkboxes + channel dropdown + BOT state
-            if data['channels_updated'] or is_first:
+            # Channel-dependent UI: always ensure consistency when
+            # channels exist.  Because a single DashboardPage instance
+            # is shared across browser sessions (render() is called on
+            # each new connection), the old session's timer can steal
+            # the is_first flag before the new timer fires.  Running
+            # these unconditionally is safe because each method has an
+            # internal fingerprint/equality check that prevents
+            # unnecessary DOM updates.
+            if data['channels']:
                 self._messages.update_filters(data)
                 self._messages.update_channel_options(data['channels'])
+                self._update_submenus(data)
+
+            # BOT checkbox state (only on actual change or first render
+            # to avoid overwriting user interaction mid-toggle)
+            if data['channels_updated'] or is_first:
                 self._actions.update(data)
 
             # Contacts
@@ -740,13 +761,6 @@ class DashboardPage:
             # RX Log
             if data['rxlog_updated']:
                 self._rxlog.update(data)
-
-            # Update dynamic drawer submenus (channels + rooms)
-            if data['channels_updated'] or is_first:
-                self._update_submenus(data)
-
-            # Clear flags
-            self._shared.clear_update_flags()
 
             # Signal BLE worker that GUI is ready for data
             if is_first and data['channels'] and data['contacts']:

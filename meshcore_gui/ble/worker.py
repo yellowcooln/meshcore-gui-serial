@@ -591,15 +591,18 @@ class BLEWorker:
         consecutive_errors = 0
 
         for idx in range(MAX_CHANNELS):
-            # Fast single-attempt probe per slot
+            # Two attempts per slot to handle transient BLE timeouts,
+            # especially on slower mobile connections.
             payload = await self._try_get_channel_info(
-                idx, max_attempts=1, delay=0.5,
+                idx, max_attempts=2, delay=1.0,
             )
 
             if payload is None:
                 consecutive_errors += 1
-                # After 2 consecutive empty slots, assume no more channels
-                if consecutive_errors >= 2:
+                # After 3 consecutive empty slots, assume no more channels.
+                # Raised from 2 to 3: a single BLE hiccup no longer causes
+                # the entire discovery to abort prematurely.
+                if consecutive_errors >= 3:
                     debug_print(
                         f"Channel discovery: {consecutive_errors} consecutive "
                         f"empty slots at idx {idx}, stopping"
@@ -650,8 +653,10 @@ class BLEWorker:
                     f"name-derived key (will retry)"
                 )
 
-            # Minimal pause between channels to avoid BLE congestion
-            await asyncio.sleep(0.15)
+            # Pause between channels to avoid BLE congestion.
+            # Increased from 0.15s to 0.3s: mobile BLE stacks need
+            # more time between consecutive GATT operations.
+            await asyncio.sleep(0.3)
 
         # Fallback: if nothing discovered, add Public as default
         if not discovered:
