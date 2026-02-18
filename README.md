@@ -116,10 +116,9 @@ Under the hood it uses `bleak` for Bluetooth Low Energy (which talks to BlueZ on
 
 ## 3. Screenshots
 
-<img width="1476" height="1168" alt="Screenshot from 2026-02-13 15-56-40" src="https://github.com/user-attachments/assets/3e969de7-0ed8-42c5-b90b-1b378e416c2e" />
-<img width="681" height="820" alt="Screenshot from 2026-02-05 12-23-24" src="https://github.com/user-attachments/assets/c8fba47a-470d-4c21-8ac2-48547bfeae3e" />
-<img width="1601" height="1020" alt="Screenshot from 2026-02-08 21-45-32" src="https://github.com/user-attachments/assets/65e4588c-4340-46e5-a649-b01b9019e7bf" />
-
+<img width="1000" height="873" alt="a_Screenshots" src="https://github.com/user-attachments/assets/bd19de9a-05f7-43fd-8acd-3b92cdf6c7fa" />
+<img width="944" height="877" alt="Screenshot from 2026-02-18 09-27-59" src="https://github.com/user-attachments/assets/6b0b19f4-9886-4cca-bd36-50b4c3797e02" />
+<img width="944" height="877" alt="Screenshot from 2026-02-18 09-28-27" src="https://github.com/user-attachments/assets/374694fa-ab2d-4b96-b81f-6a351af7710a" />
 
 ## 4. Requirements
 
