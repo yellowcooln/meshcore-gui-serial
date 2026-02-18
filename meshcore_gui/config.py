@@ -25,7 +25,25 @@ from typing import Any, Dict, List
 # ==============================================================================
 
 
-VERSION: str = "1.9.8"
+VERSION: str = "1.9.9"
+
+
+# ==============================================================================
+# OPERATOR / LANDING PAGE
+# ==============================================================================
+
+# Operator callsign shown on the landing page SVG and drawer footer.
+# Change this to your own callsign (e.g. "PE1HVH", "PE1HVH/MIT").
+OPERATOR_CALLSIGN: str = "PE1HVH"
+
+# Path to the landing page SVG file.
+# The placeholder ``{callsign}`` inside the SVG is replaced at runtime
+# with ``OPERATOR_CALLSIGN``.
+#
+# Default: the bundled DOMCA splash (static/landing_default.svg).
+# To use a custom SVG, point this to your own file, e.g.:
+#   LANDING_SVG_PATH = DATA_DIR / "landing.svg"
+LANDING_SVG_PATH: Path = Path(__file__).parent / "static" / "landing_default.svg"
 
 
 # ==============================================================================

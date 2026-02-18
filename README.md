@@ -467,6 +467,8 @@ If your MeshCore device has BLE PIN pairing enabled, make sure the D-Bus policy 
 
 | Setting | Location | Description |
 |---------|----------|-------------|
+| `OPERATOR_CALLSIGN` | `meshcore_gui/config.py` | Operator callsign shown on landing page and drawer footer (default: `"PE1HVH"`) |
+| `LANDING_SVG_PATH` | `meshcore_gui/config.py` | Path to the landing page SVG file; supports `{callsign}` placeholder (default: `static/landing_default.svg`) |
 | `DEBUG` | `meshcore_gui/config.py` | Set to `True` for verbose logging (or use `--debug-on`) |
 | `MAX_CHANNELS` | `meshcore_gui/config.py` | Maximum channel slots to probe on device (default: 8) |
 | `CHANNEL_CACHE_ENABLED` | `meshcore_gui/config.py` | Cache discovered channels to disk for faster startup (default: `False` — always fresh from device) |
@@ -803,7 +805,7 @@ meshcore-gui/
 ├── meshcore_gui/                    # Application package
 │   ├── __init__.py
 │   ├── __main__.py                  # Alternative entry: python -m meshcore_gui
-│   ├── config.py                    # DEBUG flag, channel discovery settings (MAX_CHANNELS, CHANNEL_CACHE_ENABLED), BLE_PIN, RECONNECT_* settings, refresh interval, retention settings, BOT_DEVICE_NAME, per-device log file naming
+│   ├── config.py                    # OPERATOR_CALLSIGN, LANDING_SVG_PATH, DEBUG flag, channel discovery settings (MAX_CHANNELS, CHANNEL_CACHE_ENABLED), BLE_PIN, RECONNECT_* settings, refresh interval, retention settings, BOT_DEVICE_NAME, per-device log file naming
 │   ├── ble/                         # BLE communication layer
 │   │   ├── __init__.py
 │   │   ├── worker.py                # BLE thread, connection lifecycle, cache-first startup, disconnect detection, auto-reconnect, background key retry
@@ -820,7 +822,7 @@ meshcore-gui/
 │   ├── gui/                         # NiceGUI web interface
 │   │   ├── __init__.py
 │   │   ├── constants.py             # UI display constants
-│   │   ├── dashboard.py             # Main dashboard page orchestrator
+│   │   ├── dashboard.py             # Main dashboard page orchestrator, loads landing SVG from config.LANDING_SVG_PATH
 │   │   ├── route_page.py            # Message route visualization page
 │   │   ├── archive_page.py          # Message archive viewer with filters and pagination
 │   │   └── panels/                  # Modular UI panels

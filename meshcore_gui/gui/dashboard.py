@@ -61,7 +61,7 @@ body.body--dark {
   --title: #48CAE4;  --subtitle: #48CAE4;
   --tagline: #90E0EF; --tag-op: 0.5;
   --badge-stroke: #0077B6; --badge-text: #48CAE4;
-  --pe1hvh: #0077B6;
+  --callsign: #0077B6;
 }
 /* ── DOMCA theme variables (light) ── */
 body.body--light {
@@ -74,7 +74,7 @@ body.body--light {
   --title: #0077B6;  --subtitle: #0077B6;
   --tagline: #0096C7; --tag-op: 0.4;
   --badge-stroke: #0077B6; --badge-text: #0077B6;
-  --pe1hvh: #0096C7;
+  --callsign: #0096C7;
 }
 
 /* ── DOMCA page background ── */
@@ -227,76 +227,31 @@ body, .q-layout, .q-page {
 </style>
 '''
 
-# ── DOMCA Landing SVG ────────────────────────────────────────────────
-# Extracted from domca.nl index.html — mesh logo, title, tagline.
-# Uses CSS variables defined above for dark/light theme support.
+# ── Landing SVG loader ────────────────────────────────────────────────
+# Reads the SVG from config.LANDING_SVG_PATH and replaces {callsign}
+# with config.OPERATOR_CALLSIGN.  Falls back to a minimal placeholder
+# when the file is missing.
 
-_DOMCA_SVG = '''\
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400">
-  <defs>
-    <pattern id="gp" width="20" height="20" patternUnits="userSpaceOnUse">
-      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--grid)" stroke-width="0.3"/>
-    </pattern>
-  </defs>
-  <rect width="800" height="400" fill="var(--bg)"/>
-  <rect width="800" height="400" fill="url(#gp)" opacity="var(--grid-op)"/>
-  <g opacity="var(--mesh-bg-op)" stroke="var(--mesh-bg)" stroke-width="1">
-    <line x1="50" y1="80" x2="200" y2="150"/><line x1="200" y1="150" x2="150" y2="300"/>
-    <line x1="150" y1="300" x2="350" y2="250"/><line x1="350" y1="250" x2="200" y2="150"/>
-    <line x1="600" y1="100" x2="750" y2="180"/><line x1="750" y1="180" x2="680" y2="320"/>
-    <line x1="680" y1="320" x2="550" y2="280"/><line x1="550" y1="280" x2="600" y2="100"/>
-  </g>
-  <g transform="translate(80,80)">
-    <g stroke="var(--line)" stroke-width="2.5" opacity="var(--line-op)">
-      <line x1="100" y1="30" x2="45" y2="120"/><line x1="100" y1="30" x2="155" y2="120"/>
-      <line x1="45" y1="120" x2="155" y2="120"/><line x1="100" y1="30" x2="100" y2="95"/>
-      <line x1="45" y1="120" x2="100" y2="95"/><line x1="155" y1="120" x2="100" y2="95"/>
-      <line x1="100" y1="30" x2="100" y2="5"/><line x1="45" y1="120" x2="15" y2="145"/>
-      <line x1="155" y1="120" x2="185" y2="145"/><line x1="100" y1="95" x2="30" y2="60"/>
-      <line x1="100" y1="95" x2="170" y2="60"/><line x1="100" y1="95" x2="100" y2="160"/>
-    </g>
-    <g fill="none" stroke="var(--wave)" stroke-width="1.5">
-      <path d="M 115 80 Q 135 95 115 110" opacity="0.5"/>
-      <path d="M 125 72 Q 155 95 125 118" opacity="0.35"/>
-      <path d="M 135 64 Q 175 95 135 126" opacity="0.2"/>
-    </g>
-    <circle cx="100" cy="30" r="7" fill="var(--node)"/>
-    <circle cx="100" cy="30" r="3" fill="var(--node-center)"/>
-    <circle cx="45" cy="120" r="7" fill="var(--node)"/>
-    <circle cx="45" cy="120" r="3" fill="var(--node-center)"/>
-    <circle cx="155" cy="120" r="7" fill="var(--node)"/>
-    <circle cx="155" cy="120" r="3" fill="var(--node-center)"/>
-    <circle cx="100" cy="95" r="10" fill="var(--node)"/>
-    <circle cx="100" cy="95" r="4.5" fill="var(--node-center)"/>
-    <circle cx="100" cy="5" r="4" fill="var(--outer)" opacity="0.5"/>
-    <circle cx="15" cy="145" r="4" fill="var(--outer)" opacity="0.5"/>
-    <circle cx="185" cy="145" r="4" fill="var(--outer)" opacity="0.5"/>
-    <circle cx="30" cy="60" r="4" fill="var(--outer)" opacity="0.4"/>
-    <circle cx="170" cy="60" r="4" fill="var(--outer)" opacity="0.4"/>
-    <circle cx="100" cy="160" r="4" fill="var(--outer)" opacity="0.4"/>
-    <text x="100" y="99" text-anchor="middle" font-family="'JetBrains Mono',monospace"
-          font-size="9" font-weight="700" fill="var(--hub-text)" letter-spacing="1">NL</text>
-  </g>
-  <g transform="translate(310,110)">
-    <text x="0" y="65" font-family="'Exo 2',sans-serif" font-size="92"
-          font-weight="800" fill="var(--title)" letter-spacing="8">DOMCA</text>
-    <rect x="2" y="85" width="410" height="2" fill="var(--title)" rx="1"/>
-    <text x="3" y="112" font-family="'JetBrains Mono',monospace" font-size="14.5"
-          fill="var(--subtitle)" letter-spacing="4.5" opacity="0.9"
-          >DUTCH OPEN MESHCORE ACTIVITY</text>
-    <text x="3" y="140" font-family="'JetBrains Mono',monospace" font-size="11"
-          fill="var(--tagline)" letter-spacing="2" opacity="var(--tag-op)"
-          >CONNECTING THE MESH \u00b7 SINCE 2025</text>
-  </g>
-  <g transform="translate(600,330)">
-    <rect width="140" height="32" rx="16" fill="none"
-          stroke="var(--badge-stroke)" stroke-width="1.5" opacity="0.5"/>
-    <text x="70" y="21" text-anchor="middle" font-family="'JetBrains Mono',monospace"
-          font-size="13" fill="var(--badge-text)" letter-spacing="2" opacity="0.7">domca.nl</text>
-  </g>
-  <text x="80" y="365" font-family="'JetBrains Mono',monospace" font-size="10"
-        fill="var(--pe1hvh)" letter-spacing="2" opacity="0.3">PE1HVH</text>
-</svg>'''
+
+def _load_landing_svg() -> str:
+    """Load the landing page SVG from disk.
+
+    Returns:
+        SVG markup string with ``{callsign}`` replaced by the
+        configured operator callsign.
+    """
+    path = config.LANDING_SVG_PATH
+    try:
+        raw = path.read_text(encoding="utf-8")
+        return raw.replace("{callsign}", config.OPERATOR_CALLSIGN)
+    except FileNotFoundError:
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100">'
+            '<text x="200" y="55" text-anchor="middle" '
+            'font-family="\'JetBrains Mono\',monospace" font-size="14" '
+            f'fill="var(--title)">Landing SVG not found: {path.name}</text>'
+            '</svg>'
+        )
 
 
 # ── Standalone menu items (no submenus) ──────────────────────────────
@@ -491,7 +446,7 @@ class DashboardPage:
 
             # Footer in drawer
             ui.space()
-            ui.label('\u00a9 2026 PE1HVH').classes('domca-footer').style('padding: 0 1.2rem 1rem')
+            ui.label(f'\u00a9 2026 {config.OPERATOR_CALLSIGN}').classes('domca-footer').style('padding: 0 1.2rem 1rem')
 
         # ── Header ────────────────────────────────────────────────
         with ui.header().classes('items-center px-4 py-2 shadow-md'):
@@ -523,10 +478,10 @@ class DashboardPage:
         # ── Main Content Area ─────────────────────────────────────
         self._panel_containers = {}
 
-        # Landing page (DOMCA SVG splash — visible by default)
+        # Landing page (SVG splash from file — visible by default)
         landing = ui.column().classes('domca-landing w-full')
         with landing:
-            ui.html(_DOMCA_SVG)
+            ui.html(_load_landing_svg())
         self._panel_containers['landing'] = landing
 
         # Panel containers (hidden by default, shown on menu click)

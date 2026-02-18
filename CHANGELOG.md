@@ -8,6 +8,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.9.9] - 2026-02-18 — Variable Landing Page & Operator Callsign
+
+### Added
+- ✅ **Configurable operator callsign** — New `OPERATOR_CALLSIGN` constant in `config.py` (default: `"PE1HVH"`). Used in the landing page SVG and the drawer footer copyright label. Change this single value to personalize the entire GUI for a different operator
+- ✅ **External landing page SVG** — The DOMCA splash screen is now loaded from a standalone file (`static/landing_default.svg`) instead of being hardcoded in `dashboard.py`. New `LANDING_SVG_PATH` constant in `config.py` points to the SVG file. The placeholder `{callsign}` in the SVG is replaced at runtime with `OPERATOR_CALLSIGN`
+- ✅ **Landing page customization** — To use a custom landing page: copy `landing_default.svg` (or create your own SVG), use `{callsign}` wherever the operator callsign should appear, and point `LANDING_SVG_PATH` to your file. The default SVG includes an instructive comment block explaining the placeholder mechanism
+
+### Changed
+- 🔄 `config.py`: Added `OPERATOR_CALLSIGN` and `LANDING_SVG_PATH` constants in new **OPERATOR / LANDING PAGE** section; version bumped to `1.9.9`
+- 🔄 `gui/dashboard.py`: Removed hardcoded `_DOMCA_SVG` string (~70 lines); added `_load_landing_svg()` helper that reads SVG from disk and replaces `{callsign}` placeholder; CSS variable `--pe1hvh` renamed to `--callsign`; drawer footer copyright label now uses `config.OPERATOR_CALLSIGN`
+
+### Added (files)
+- ✅ `static/landing_default.svg` — The original DOMCA splash SVG extracted as a standalone file, with `{callsign}` placeholder and `--callsign` CSS variable. Serves as both the default landing page and a reference template for custom SVGs
+
+### Impact
+- Out-of-the-box behavior is identical to v1.9.8 (same DOMCA branding, same PE1HVH callsign)
+- Operators personalize by changing 1–2 lines in `config.py` — no code modifications needed
+- Fallback: if the SVG file is missing, a minimal placeholder text is shown instead of a crash
+- No breaking changes — all existing dashboard functionality (panels, menus, timer, theming) unchanged
+
+---
+
 ## [1.9.8] - 2026-02-17 — Bugfix: Route Page Sender ID, Type & Location Not Populated
 
 ### Fixed
