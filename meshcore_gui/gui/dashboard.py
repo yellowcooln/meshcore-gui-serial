@@ -678,6 +678,8 @@ class DashboardPage:
             # Device info
             if data['device_updated'] or is_first:
                 self._device.update(data)
+                # to show own position if changed
+                self._map.update(data)
 
             # Channel-dependent UI: always ensure consistency when
             # channels exist.  Because a single DashboardPage instance

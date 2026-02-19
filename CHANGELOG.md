@@ -8,6 +8,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.9.10] - 2026-02-19 — Map Tooltips & Separate Own-Position Marker
+
+### Added
+- ✅ **Map marker tooltips** — All markers on the Leaflet map now show a tooltip on hover with the node name and type icon (📱, 📡, 🏠) from `TYPE_ICONS`
+- ✅ **Separate own-position marker** — The device's own position is now tracked as a dedicated `_own_marker`, independent from contact markers. This prevents the own marker from being removed/recreated on every contact update cycle
+
+### Changed
+- 🔄 `gui/panels/map_panel.py`: Renamed `_markers` to `_contacts_markers`; added `_own_marker` attribute; own position marker is only updated when `device_updated` flag is set (not every timer tick); contact markers are only rebuilt when `contacts_updated` is set; added `TYPE_ICONS` import for tooltip icons
+- 🔄 `gui/dashboard.py`: Added `self._map.update(data)` call in the `device_updated` block so the own-position marker updates when device info changes (e.g. GPS position update)
+- 🔄 `config.py`: Version bumped to `1.9.10`
+
+### Impact
+- Map centering on own device now works correctly and updates only when position actually changes
+- Contact markers are no longer needlessly destroyed and recreated on every UI timer tick — only on actual contact data changes
+- Tooltips make it easy to identify nodes on the map without clicking
+- No breaking changes — all existing map functionality preserved
+
+### Credits
+- Based on [PR #16](https://github.com/pe1hvh/meshcore-gui/pull/16) by [@rich257](https://github.com/rich257)
+
+---
+
 ## [1.9.9] - 2026-02-18 — Variable Landing Page & Operator Callsign
 
 ### Added
