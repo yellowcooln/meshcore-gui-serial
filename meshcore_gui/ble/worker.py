@@ -264,6 +264,8 @@ class BLEWorker:
                         # Reload data and resume
                         await self._load_data()
                         await self.mc.start_auto_message_fetching()
+                        # Re-seed dedup so replayed messages are suppressed
+                        self._seed_dedup_from_messages()
                         self.shared.set_connected(True)
                         self.shared.set_status("✅ Herverbonden")
                         print("BLE: ✅ Herverbonden en operationeel")
@@ -429,6 +431,10 @@ class BLEWorker:
         count = self.shared.load_recent_from_archive(limit=100)
         if count:
             debug_print(f"Cache → {count} recent messages from archive")
+
+        # Seed deduplicator with archived messages so that BLE events
+        # for already-known messages are suppressed on (re)connect.
+        self._seed_dedup_from_messages()
 
     # ------------------------------------------------------------------
     # Initial data loading (refreshes cache)
@@ -800,6 +806,26 @@ class BLEWorker:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _seed_dedup_from_messages(self) -> None:
+        """Seed the deduplicator with messages already in SharedData.
+
+        Called after archive load so that BLE events carrying the same
+        message_hash or content as an already-displayed message are
+        correctly suppressed.  This prevents duplicates when the mesh
+        device replays pending messages after a (re)connect.
+        """
+        snapshot = self.shared.get_snapshot()
+        messages = snapshot.get('messages', [])
+        seeded = 0
+        for msg in messages:
+            if msg.message_hash:
+                self._dedup.mark_hash(msg.message_hash)
+                seeded += 1
+            if msg.sender and msg.text:
+                self._dedup.mark_content(msg.sender, msg.channel, msg.text)
+                seeded += 1
+        debug_print(f"Dedup seeded with {seeded} entries from {len(messages)} messages")
 
     @staticmethod
     def _extract_secret(secret) -> Optional[bytes]:

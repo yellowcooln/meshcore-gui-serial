@@ -47,6 +47,11 @@ class SharedData:
         self.messages: List[Message] = []
         self.rx_log: List[RxLogEntry] = []
 
+        # Dedup guard: fingerprints of messages already in self.messages.
+        # Acts as last-line-of-defence against duplicate inserts regardless
+        # of the source (archive reload, BLE event, reconnect).
+        self._message_fingerprints: set = set()
+
         # Command queue (GUI → BLE)
         self.cmd_queue: queue.Queue = queue.Queue()
 
@@ -286,8 +291,29 @@ class SharedData:
             self.channels_updated = True
             debug_print(f"Channels updated: {[c['name'] for c in channels]}")
 
+    @staticmethod
+    def _message_fingerprint(msg: Message) -> str:
+        """Build a dedup fingerprint for a message.
+
+        Uses message_hash when available (deterministic packet ID),
+        otherwise falls back to a composite of channel, sender and text.
+
+        Args:
+            msg: Message to fingerprint.
+
+        Returns:
+            String key suitable for set membership tests.
+        """
+        if msg.message_hash:
+            return f"h:{msg.message_hash}"
+        return f"c:{msg.channel}:{msg.sender}:{msg.text}"
+
     def add_message(self, msg: Message) -> None:
         """Add a Message to the store (max 100).
+
+        Skips the message if an identical fingerprint is already present,
+        preventing duplicates regardless of the insertion source (archive
+        reload, BLE event, reconnect).
 
         Also resolves channel_name and path_names from the current
         contacts/channels list if not already set, and appends to the
@@ -295,6 +321,15 @@ class SharedData:
         archive and cache in sync.
         """
         with self.lock:
+            # Dedup guard: skip if fingerprint already tracked
+            fp = self._message_fingerprint(msg)
+            if fp in self._message_fingerprints:
+                debug_print(
+                    f"Message skipped (duplicate fingerprint): "
+                    f"{msg.sender}: {msg.text[:30]}"
+                )
+                return
+
             # Resolve channel_name if missing
             if not msg.channel_name and msg.channel is not None:
                 msg.channel_name = self._resolve_channel_name(msg.channel)
@@ -304,8 +339,14 @@ class SharedData:
                 msg.path_names = self._resolve_path_names(msg.path_hashes)
 
             self.messages.append(msg)
+            self._message_fingerprints.add(fp)
+
             if len(self.messages) > 100:
-                self.messages.pop(0)
+                removed = self.messages.pop(0)
+                # Evict fingerprint of removed message
+                removed_fp = self._message_fingerprint(removed)
+                self._message_fingerprints.discard(removed_fp)
+
             debug_print(
                 f"Message added: {msg.sender}: {msg.text[:30]}"
             )
@@ -383,6 +424,10 @@ class SharedData:
         persistent archive so the main page shows historical messages
         immediately, before any live BLE traffic arrives.
 
+        Safe to call multiple times (idempotent): clears the existing
+        message list and fingerprint set before loading, so reconnect
+        cycles do not produce duplicates.
+
         Messages are inserted directly (not re-archived) to avoid
         duplicating data on disk.
 
@@ -400,19 +445,31 @@ class SharedData:
             return 0
 
         with self.lock:
+            # Clear existing messages and fingerprints to ensure
+            # idempotent behaviour on repeated calls (reconnect).
+            self.messages.clear()
+            self._message_fingerprints.clear()
+
             # recent is newest-first; reverse so oldest is appended first
             for msg_dict in reversed(recent):
                 msg = Message.from_dict(msg_dict)
-                self.messages.append(msg)
+                fp = self._message_fingerprint(msg)
+                if fp not in self._message_fingerprints:
+                    self.messages.append(msg)
+                    self._message_fingerprints.add(fp)
 
             # Cap at 100 (same as add_message)
             if len(self.messages) > 100:
                 self.messages = self.messages[-100:]
+                # Rebuild fingerprint set from retained messages
+                self._message_fingerprints = {
+                    self._message_fingerprint(m) for m in self.messages
+                }
 
             debug_print(
-                f"Loaded {len(recent)} recent messages from archive"
+                f"Loaded {len(self.messages)} recent messages from archive"
             )
-            return len(recent)
+            return len(self.messages)
 
     # ------------------------------------------------------------------
     # Snapshot and flags

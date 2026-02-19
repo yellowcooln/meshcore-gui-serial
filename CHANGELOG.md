@@ -8,6 +8,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.9.11] - 2026-02-19 — Message Dedup Hotfix
+
+### Fixed
+- 🛠 **Duplicate messages after (re)connect** — `load_recent_from_archive()` appended archived messages on every connect attempt without clearing existing entries; after N failed connects, each message appeared N times. Method is now idempotent: clears the in-memory list before loading.
+- 🛠 **Persistent duplicate messages** — Live BLE events for messages already loaded from archive were not suppressed because the `DualDeduplicator` was never seeded with archived content. Added `_seed_dedup_from_messages()` in `BLEWorker` after cache/archive load and after reconnect.
+- 🛠 **Last-line-of-defence dedup in SharedData** — `add_message()` now maintains a fingerprint set (`message_hash` or `channel:sender:text`) and silently skips messages whose fingerprint is already tracked. This guards against duplicates regardless of their source.
+- 🛠 **Messages panel empty on first click** — `_show_panel()` made the container visible but relied on the next 500 ms timer tick to populate it. Added an immediate `_messages.update()` call so content is rendered the moment the panel becomes visible.
+
+### Changed
+- 🔄 `core/shared_data.py`: Added `_message_fingerprints` set and `_message_fingerprint()` static method; `add_message()` checks fingerprint before insert and evicts fingerprints when messages are rotated out; `load_recent_from_archive()` clears messages and fingerprints before loading (idempotent)
+- 🔄 `ble/worker.py`: Added `_seed_dedup_from_messages()` helper; called after `_apply_cache()` and after reconnect `_load_data()` to seed `DualDeduplicator` with existing messages
+- 🔄 `gui/dashboard.py`: `_show_panel()` now forces an immediate `_messages.update()` when the messages panel is shown, eliminating the stale-content flash
+- 🔄 `config.py`: Version bumped to `1.9.11`
+
+### Impact
+- Eliminates all duplicate message display scenarios: initial connect, failed retries, reconnect, and BLE event replay
+- No breaking changes — all existing functionality preserved
+- Fingerprint set is bounded to the same 100-message cap as the message list
+
+---
+
 ## [1.9.10] - 2026-02-19 — Map Tooltips & Separate Own-Position Marker
 
 ### Added

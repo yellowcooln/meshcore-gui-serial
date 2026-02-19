@@ -622,6 +622,20 @@ class DashboardPage:
         # Apply channel filter to messages panel
         if panel_id == 'messages' and self._messages:
             self._messages.set_active_channel(channel)
+            # Force immediate rebuild so the panel is populated the
+            # moment it becomes visible, instead of waiting for the
+            # next 500 ms timer tick (which caused the "empty on first
+            # click, populated on second click" symptom).
+            data = self._shared.get_snapshot()
+            self._messages.update(
+                data,
+                self._messages.channel_filters,
+                self._messages.last_channels,
+                room_pubkeys=(
+                    self._room_server.get_room_pubkeys()
+                    if self._room_server else None
+                ),
+            )
 
         # Apply channel filter to archive panel
         if panel_id == 'archive' and self._archive_page:
