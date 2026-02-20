@@ -7,6 +7,7 @@ All visual content is delegated to individual panel classes in
 """
 
 import logging
+from urllib.parse import urlencode
 
 from nicegui import ui
 
@@ -366,7 +367,7 @@ class DashboardPage:
             with ui.column().style('padding: 0.2rem 1.2rem 0'):
                 ui.button(
                     'DOMCA',
-                    on_click=lambda: self._show_panel('landing'),
+                    on_click=lambda: self._navigate_panel('landing'),
                 ).props('flat no-caps').style(
                     "font-family: 'Exo 2', sans-serif; font-size: 1.4rem; "
                     "font-weight: 800; color: var(--title); letter-spacing: 4px; "
@@ -382,10 +383,10 @@ class DashboardPage:
                 self._msg_sub_container = ui.column().classes('w-full gap-0')
                 with self._msg_sub_container:
                     self._make_sub_btn(
-                        'ALL', lambda: self._show_panel('messages', channel=None)
+                        'ALL', lambda: self._navigate_panel('messages', channel=None)
                     )
                     self._make_sub_btn(
-                        'DM', lambda: self._show_panel('messages', channel='DM')
+                        'DM', lambda: self._navigate_panel('messages', channel='DM')
                     )
                     # Dynamic channel items populated by _update_submenus
 
@@ -396,14 +397,14 @@ class DashboardPage:
                 self._rooms_sub_container = ui.column().classes('w-full gap-0')
                 with self._rooms_sub_container:
                     self._make_sub_btn(
-                        'ALL', lambda: self._show_panel('rooms')
+                        'ALL', lambda: self._navigate_panel('rooms')
                     )
                     # Pre-populate from persisted rooms
                     for entry in self._room_password_store.get_rooms():
                         short = entry.name or entry.pubkey[:12]
                         self._make_sub_btn(
                             f'\U0001f3e0 {short}',
-                            lambda: self._show_panel('rooms'),
+                            lambda: self._navigate_panel('rooms'),
                         )
 
             # ── 📚 ARCHIVE (expandable with channel submenu) ──────
@@ -413,10 +414,10 @@ class DashboardPage:
                 self._archive_sub_container = ui.column().classes('w-full gap-0')
                 with self._archive_sub_container:
                     self._make_sub_btn(
-                        'ALL', lambda: self._show_panel('archive', channel=None)
+                        'ALL', lambda: self._navigate_panel('archive', channel=None)
                     )
                     self._make_sub_btn(
-                        'DM', lambda: self._show_panel('archive', channel='DM')
+                        'DM', lambda: self._navigate_panel('archive', channel='DM')
                     )
                     # Dynamic channel items populated by _update_submenus
 
@@ -426,7 +427,7 @@ class DashboardPage:
             for icon, label, panel_id in _STANDALONE_ITEMS:
                 btn = ui.button(
                     f'{icon}  {label}',
-                    on_click=lambda pid=panel_id: self._show_panel(pid),
+                    on_click=lambda pid=panel_id: self._navigate_panel(pid),
                 ).props('flat no-caps align=left').classes(
                     'w-full justify-start domca-menu-btn'
                 ).style(_MENU_BTN_STYLE)
@@ -515,6 +516,7 @@ class DashboardPage:
         self._active_panel = 'landing'
 
         # Start update timer
+        self._apply_url_state()
         ui.timer(0.5, self._update_ui)
 
     # ------------------------------------------------------------------
@@ -553,17 +555,17 @@ class DashboardPage:
                 self._msg_sub_container.clear()
                 with self._msg_sub_container:
                     self._make_sub_btn(
-                        'ALL', lambda: self._show_panel('messages', channel=None)
+                        'ALL', lambda: self._navigate_panel('messages', channel=None)
                     )
                     self._make_sub_btn(
-                        'DM', lambda: self._show_panel('messages', channel='DM')
+                        'DM', lambda: self._navigate_panel('messages', channel='DM')
                     )
                     for ch in channels:
                         idx = ch['idx']
                         name = ch['name']
                         self._make_sub_btn(
                             f"[{idx}] {name}",
-                            lambda i=idx: self._show_panel('messages', channel=i),
+                            lambda i=idx: self._navigate_panel('messages', channel=i),
                         )
 
             # Rebuild Archive submenu
@@ -571,17 +573,17 @@ class DashboardPage:
                 self._archive_sub_container.clear()
                 with self._archive_sub_container:
                     self._make_sub_btn(
-                        'ALL', lambda: self._show_panel('archive', channel=None)
+                        'ALL', lambda: self._navigate_panel('archive', channel=None)
                     )
                     self._make_sub_btn(
-                        'DM', lambda: self._show_panel('archive', channel='DM')
+                        'DM', lambda: self._navigate_panel('archive', channel='DM')
                     )
                     for ch in channels:
                         idx = ch['idx']
                         name = ch['name']
                         self._make_sub_btn(
                             f"[{idx}] {name}",
-                            lambda n=name: self._show_panel('archive', channel=n),
+                            lambda n=name: self._navigate_panel('archive', channel=n),
                         )
 
         # ── Room submenus ──
@@ -595,18 +597,59 @@ class DashboardPage:
                 self._rooms_sub_container.clear()
                 with self._rooms_sub_container:
                     self._make_sub_btn(
-                        'ALL', lambda: self._show_panel('rooms')
+                        'ALL', lambda: self._navigate_panel('rooms')
                     )
                     for entry in rooms:
                         short = entry.name or entry.pubkey[:12]
                         self._make_sub_btn(
                             f'\U0001f3e0 {short}',
-                            lambda: self._show_panel('rooms'),
+                            lambda: self._navigate_panel('rooms'),
                         )
 
     # ------------------------------------------------------------------
     # Panel switching (layout helper — no functional logic)
     # ------------------------------------------------------------------
+
+    def _apply_url_state(self) -> None:
+        """Apply panel selection from URL query params on first render."""
+        try:
+            params = ui.context.client.request.query_params
+        except Exception:
+            return
+
+        panel = params.get('panel') or 'landing'
+        channel = params.get('channel')
+
+        if panel not in self._panel_containers:
+            panel = 'landing'
+            channel = None
+
+        if panel == 'messages':
+            if channel is None or channel.lower() == 'all':
+                channel = None
+            elif channel.upper() == 'DM':
+                channel = 'DM'
+            else:
+                channel = int(channel) if channel.isdigit() else None
+        elif panel == 'archive':
+            if channel is None or channel.lower() == 'all':
+                channel = None
+            elif channel.upper() == 'DM':
+                channel = 'DM'
+        else:
+            channel = None
+
+        self._show_panel(panel, channel)
+
+    def _build_panel_url(self, panel_id: str, channel=None) -> str:
+        params = {'panel': panel_id}
+        if channel is not None:
+            params['channel'] = str(channel)
+        return '/?' + urlencode(params)
+
+    def _navigate_panel(self, panel_id: str, channel=None) -> None:
+        """Navigate with panel id in the URL so browser back restores state."""
+        ui.navigate.to(self._build_panel_url(panel_id, channel))
 
     def _show_panel(self, panel_id: str, channel=None) -> None:
         """Show the selected panel, hide all others, close the drawer.

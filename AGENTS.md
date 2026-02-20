@@ -37,6 +37,10 @@ MeshCore GUI is a NiceGUI-based desktop/headless web UI for MeshCore radios. Thi
 - Map theme follows UI dark/light mode by default.
 - Map theme can be overridden with the **Theme** toggle (Auto/Dark/Light).
 
+## Panel URLs
+- Drawer and sidebar actions navigate to `/?panel=<id>&channel=<optional>` so browser back restores the last panel.
+- On load, the dashboard reads the query params and shows the requested panel.
+
 ## Route Viewer
 - Clicking a message opens `/route/{msg_key}` in the **same tab**.
 - The route page has **Back to Dashboard** and **Back to Archive** buttons.

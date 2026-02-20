@@ -312,7 +312,23 @@ A systemd service starts automatically on boot, restarts on crashes, and integra
 
 #### 7.5.1. Automated Setup
 
-The included `install_ble_stable.sh` script is BLE-specific and not used for serial setups. Use the manual setup below.
+Use the serial installer:
+
+```bash
+bash install_serial.sh
+```
+
+Environment variables (optional):
+
+```bash
+SERIAL_PORT=/dev/ttyACM0
+BAUD=115200
+SERIAL_CX_DLY=0.1
+WEB_PORT=8081
+DEBUG_ON=yes
+```
+
+The included `install_ble_stable.sh` script is BLE-specific and not used for serial setups.
 
 #### 7.5.2. Manual Setup
 
@@ -733,7 +749,8 @@ Debug output is written to both stdout and a per-device rotating log file at `~/
 ```
 meshcore-gui/
 ├── meshcore_gui.py                  # Entry point
-├── install_ble_stable.sh            # Automated installer (systemd, path detection)
+├── install_ble_stable.sh            # BLE installer (legacy)
+├── install_serial.sh                # Serial installer (systemd, path detection)
 ├── meshcore_gui/                    # Application package
 │   ├── __init__.py
 │   ├── __main__.py                  # Alternative entry: python -m meshcore_gui
