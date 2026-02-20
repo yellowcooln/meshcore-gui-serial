@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-orange.svg)
 
-A graphical user interface for MeshCore mesh network devices via Bluetooth Low Energy (BLE) for on your desktop or as a headless service on your local network.
+A graphical user interface for MeshCore mesh network devices via USB serial for on your desktop or as a headless service on your local network.
 
 ## Table of Contents
 
@@ -19,10 +19,9 @@ A graphical user interface for MeshCore mesh network devices via Bluetooth Low E
   - [5.2. Clone the Repository](#52-clone-the-repository)
   - [5.3. Create Virtual Environment](#53-create-virtual-environment)
   - [5.4. Install Python Packages](#54-install-python-packages)
-  - [5.5. BLE PIN Pairing](#55-ble-pin-pairing-linux-only--automatic)
 - [6. Usage](#6-usage)
   - [6.1. Activate the Virtual Environment](#61-activate-the-virtual-environment)
-  - [6.2. Find Your BLE Device Address](#62-find-your-ble-device-address)
+  - [6.2. Find Your Serial Port](#62-find-your-serial-port)
   - [6.3. Configure Channels](#63-configure-channels-optional)
   - [6.4. Start the GUI](#64-start-the-gui)
 - [7. Starting the Application](#7-starting-the-application)
@@ -71,24 +70,22 @@ A graphical user interface for MeshCore mesh network devices via Bluetooth Low E
 
 ## 1. Why This Project Exists
 
-MeshCore devices like the SenseCAP T1000-E can be managed through two interfaces: USB serial and BLE (Bluetooth Low Energy). The official companion apps communicate with devices over BLE, but they are mobile-only. If you want to manage your MeshCore device from a desktop or laptop, the usual approach is to **flash USB-serial firmware** via the web flasher. However, this replaces the BLE Companion firmware, which means you can no longer use the device with mobile companion apps (Android/iOS).
+MeshCore devices like the SenseCAP T1000-E can be managed through two interfaces: USB serial and BLE (Bluetooth Low Energy). The official companion apps communicate with devices over BLE, but they are mobile-only. For desktop or headless operation, USB serial is the most reliable option and works on all platforms.
 
-This project provides a **native desktop GUI** that connects to your MeshCore device over BLE:
+This project provides a **native desktop GUI** that connects to your MeshCore device over USB serial:
 
-- **No firmware changes required** — your device stays on BLE Companion firmware and remains fully compatible with the mobile apps
+- **Serial Companion firmware required** — the device must run the USB-serial companion firmware
 - **Cross-platform** — written in Python using cross-platform libraries, runs on Linux, macOS and Windows
 - **Headless capable** — since the interface is web-based (powered by NiceGUI), it also runs headless on devices like a Raspberry Pi, accessible from any browser on your local network
 - **Message archive** — all messages are persisted to disk with configurable retention, so you maintain a searchable history of mesh traffic
-- **Bots and observation** — run a keyword-triggered auto-reply bot or passively observe mesh traffic 24/7 without dedicated hardware, using any device that has Bluetooth
+- **Bots and observation** — run a keyword-triggered auto-reply bot or passively observe mesh traffic 24/7
 - **Room Server support** — login to Room Servers directly from the GUI with dedicated message panels per room
 
 > **Note:** This project is under active development. Not all features from the official MeshCore Companion apps have been implemented yet. Contributions and feedback are welcome.
 
-> **Note:** This application has been tested on Linux (Ubuntu 24.04) and Raspberry Pi 5 (Debian Bookworm, headless). macOS and Windows should work since all dependencies (`bleak`, `nicegui`, `meshcore`) are cross-platform, but this has not been verified. Feedback and contributions for other platforms are welcome.
+> **Note:** This application has been tested on Linux (Ubuntu 24.04) and Raspberry Pi 5 (Debian Bookworm, headless). macOS and Windows should work since all dependencies (`nicegui`, `meshcore`) are cross-platform, but this has not been verified. Feedback and contributions for other platforms are welcome.
 
-Under the hood it uses `bleak` for Bluetooth Low Energy (which talks to BlueZ on Linux, CoreBluetooth on macOS, and WinRT on Windows), `meshcore` as the protocol layer, `meshcoredecoder` for raw LoRa packet decryption and route extraction, and `NiceGUI` for the web-based interface.
-
-> **Linux users:** BLE on Linux can be temperamental. BlueZ occasionally gets into a bad state, especially after repeated connect/disconnect cycles. Since v5.11.0 MeshCore GUI includes a **built-in BLE PIN agent** and **automatic reconnect with bond cleanup**, eliminating the need for external tools like `bt-agent` or manual `bluetoothctl remove` commands. If you run into connection issues, see the [Troubleshooting Guide](docs/TROUBLESHOOTING.md). On macOS and Windows, BLE is generally more stable out of the box.
+Under the hood it uses `meshcore` as the protocol layer, `meshcoredecoder` for raw LoRa packet decryption and route extraction, and `NiceGUI` for the web-based interface.
 
 
 ## 2. Features
@@ -104,15 +101,14 @@ Under the hood it uses `bleak` for Bluetooth Low Energy (which talks to BlueZ on
 <!-- ADDED: Message Archive feature was missing from features list -->
 - **Room Server Support** — Login to Room Servers directly from the GUI. Each Room Server gets a dedicated panel with message display, send functionality and login/logout controls. Passwords are stored securely outside the repository. Message author attribution correctly resolves the real sender from signed messages
 <!-- ADDED: Room Server feature (v5.7.0) -->
-- **Dynamic Channel Discovery** — Channels are automatically discovered from the device at startup via BLE probing, eliminating the need to manually configure `CHANNELS_CONFIG`
+- **Dynamic Channel Discovery** — Channels are automatically discovered from the device at startup via probing, eliminating the need to manually configure `CHANNELS_CONFIG`
 <!-- ADDED: Dynamic channel discovery (v5.7.0) -->
 - **Keyword Bot** — Built-in auto-reply bot that responds to configurable keywords on selected channels, with cooldown and loop prevention
 - **Packet Decoding** — Raw LoRa packets from RX log are decoded and decrypted using channel keys, providing message hashes, path hashes and hop data
 - **Message Deduplication** — Dual-strategy dedup (hash-based and content-based) prevents duplicate messages from appearing
-- **Local Cache** — Device info, contacts and channel keys are cached to disk (`~/.meshcore-gui/cache/`) so the GUI is instantly populated on startup from the last known state, even before BLE connects. Contacts from the device are merged with cached contacts so offline nodes are preserved. Channel keys that fail to load at startup are retried in the background every 30 seconds
+- **Local Cache** — Device info, contacts and channel keys are cached to disk (`~/.meshcore-gui/cache/`) so the GUI is instantly populated on startup from the last known state, even before the serial link connects. Contacts from the device are merged with cached contacts so offline nodes are preserved. Channel keys that fail to load at startup are retried in the background every 30 seconds
 - **Periodic Contact Refresh** — Contacts are automatically refreshed from the device at a configurable interval (default: 5 minutes) and merged with the cache
-- **Threaded Architecture** — BLE communication in separate thread for stable UI
-- **BLE Connection Stability** — Built-in D-Bus PIN agent (no external `bt-agent` needed), automatic bond cleanup on startup, and automatic reconnect with linear backoff after disconnect
+- **Threaded Architecture** — Serial communication in separate thread for stable UI
 
 ## 3. Screenshots
 
@@ -123,17 +119,17 @@ Under the hood it uses `bleak` for Bluetooth Low Energy (which talks to BlueZ on
 ## 4. Requirements
 
 - Python 3.10+
-- Bluetooth Low Energy compatible adapter (built-in or USB)
-- MeshCore device with BLE Companion firmware
+- USB serial connection to the device
+- MeshCore device with Serial Companion firmware
 
 ### 4.1. Platform Support
 
-| Platform | BLE Backend | Status |
+| Platform | Serial Backend | Status |
 |---|---|---|
-| Linux (Ubuntu/Debian) | BlueZ/D-Bus | ✅ Tested |
-| Raspberry Pi 5 (Debian Bookworm) | BlueZ/D-Bus | ✅ Tested (headless) |
-| macOS | CoreBluetooth | ⬜ Untested |
-| Windows 10/11 | WinRT | ⬜ Untested |
+| Linux (Ubuntu/Debian) | pySerial / serial-asyncio | ✅ Tested |
+| Raspberry Pi 5 (Debian Bookworm) | pySerial / serial-asyncio | ✅ Tested (headless) |
+| macOS | pySerial / serial-asyncio | ⬜ Untested |
+| Windows 10/11 | pySerial / serial-asyncio | ⬜ Untested |
 
 ## 5. Installation
 
@@ -142,14 +138,13 @@ Under the hood it uses `bleak` for Bluetooth Low Energy (which talks to BlueZ on
 **Linux (Ubuntu/Debian):**
 ```bash
 sudo apt update
-sudo apt install python3-pip python3-venv bluetooth bluez
+sudo apt install python3-pip python3-venv
 ```
 
 **Raspberry Pi (Raspberry Pi OS Lite):**
 ```bash
 sudo apt update
-sudo apt install python3-pip python3-venv bluetooth bluez git
-sudo usermod -aG bluetooth $USER
+sudo apt install python3-pip python3-venv git
 ```
 
 **macOS:**
@@ -157,11 +152,11 @@ sudo usermod -aG bluetooth $USER
 # Python 3.10+ via Homebrew (if not already installed)
 brew install python
 ```
-No additional Bluetooth packages needed — macOS has CoreBluetooth built in.
+No additional system packages needed.
 
 **Windows:**
 - Install [Python 3.10+](https://www.python.org/downloads/) (check "Add to PATH" during installation)
-- No additional Bluetooth packages needed — Windows 10/11 has WinRT built in.
+- No additional system packages needed.
 
 ### 5.2. Clone the Repository
 
@@ -187,39 +182,8 @@ venv\Scripts\activate
 ### 5.4. Install Python Packages
 
 ```bash
-pip install nicegui meshcore bleak meshcoredecoder
+pip install nicegui meshcore meshcoredecoder
 ```
-
-### 5.5. BLE PIN Pairing (Linux only — automatic)
-
-Since v5.11.0, MeshCore GUI includes a **built-in D-Bus PIN agent** that handles BLE pairing automatically. No external tools or services are required.
-
-> **Note:** On macOS and Windows, BLE pairing is handled natively by the OS. If your MeshCore device does not have PIN pairing enabled, no setup is needed.
-
-The built-in agent requires permission to access BlueZ via D-Bus. The automated installer (`install_ble_stable.sh`) creates this configuration automatically. For manual setup, create a D-Bus policy file:
-
-```bash
-sudo tee /etc/dbus-1/system.d/meshcore-ble.conf << EOF
-<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
-  "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
-<busconfig>
-  <policy user="$(whoami)">
-    <allow send_destination="org.bluez"/>
-    <allow send_interface="org.bluez.Agent1"/>
-    <allow send_interface="org.bluez.AgentManager1"/>
-  </policy>
-</busconfig>
-EOF
-```
-
-The PIN defaults to `123456` and can be overridden at startup with `--ble-pin=PIN`, or by editing `BLE_PIN` in `meshcore_gui/config.py`.
-
-> **Migrating from bt-agent:** If you previously used `bt-agent.service` for PIN pairing, it is no longer needed. Remove it:
-> ```bash
-> sudo systemctl disable --now bt-agent
-> sudo apt remove bluez-tools   # optional
-> rm -f ~/.meshcore-ble-pin
-> ```
 
 ## 6. Usage
 
@@ -237,32 +201,25 @@ cd meshcore-gui
 venv\Scripts\activate
 ```
 
-### 6.2. Find Your BLE Device Address
+### 6.2. Find Your Serial Port
 
 **Linux:**
 ```bash
-bluetoothctl scan on
+ls -l /dev/serial/by-id
 ```
-Look for your MeshCore device and note the MAC address (e.g., `AA:BB:CC:DD:EE:FF`).
+Look for your MeshCore device and note the device path (e.g., `/dev/ttyUSB0`).
 
-**macOS / Windows:**
+**macOS:**
 ```bash
-python -c "
-import asyncio
-from bleak import BleakScanner
-async def scan():
-    devices = await BleakScanner.discover(5.0)
-    for d in devices:
-        if 'MeshCore' in (d.name or ''):
-            print(f'{d.address}  {d.name}')
-asyncio.run(scan())
-"
+ls /dev/tty.usb* /dev/tty.usbserial* /dev/tty.usbmodem*
 ```
-On macOS the address will be a UUID (e.g., `12345678-ABCD-...`) rather than a MAC address.
+
+**Windows:**
+Open Device Manager → Ports (COM & LPT) and note the COM port (e.g., `COM3`).
 
 ### 6.3. Configure Channels (optional)
 
-Channels are automatically discovered from the device at startup via BLE. No manual configuration is required.
+Channels are automatically discovered from the device at startup via the serial link. No manual configuration is required.
 
 If you want to cache the discovered channel list to disk (for faster startup), set `CHANNEL_CACHE_ENABLED = True` in `meshcore_gui/config.py`. By default, channels are always fetched fresh from the device.
 
@@ -289,12 +246,13 @@ source venv/bin/activate       # Linux / macOS
 |------|-------------|---------|
 | `--debug-on` | Enable verbose debug logging (stdout + log file) | Off |
 | `--port=PORT` | Web server port | `8081` |
-| `--ble-pin=PIN` | BLE pairing PIN | `123456` |
+| `--baud=BAUD` | Serial baudrate | `115200` |
+| `--serial-cx-dly=SECONDS` | Serial connection delay | `0.1` |
 
 All flags are optional and can be combined in any order:
 
 ```bash
-python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on --port=8082 --ble-pin=171227
+python meshcore_gui.py /dev/ttyUSB0 --debug-on --port=8082 --baud=115200
 ```
 
 ### 7.2. Method 1: Interactive (foreground)
@@ -302,7 +260,7 @@ python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on --port=8082 --ble-pin=171227
 The simplest way to start — runs in your current terminal. Output is visible directly. Press `Ctrl+C` to stop.
 
 ```bash
-python meshcore_gui.py AA:BB:CC:DD:EE:FF
+python meshcore_gui.py /dev/ttyUSB0
 ```
 
 Open your browser at `http://localhost:8081` (or the port you specified with `--port`).
@@ -314,7 +272,7 @@ This is the recommended method during development or when debugging, because you
 Runs in the background but keeps the output visible in your terminal. Useful for SSH sessions where you want to monitor the application while keeping the terminal usable.
 
 ```bash
-nohup python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on > ~/meshcore.log 2>&1 &
+nohup python meshcore_gui.py /dev/ttyUSB0 --debug-on > ~/meshcore.log 2>&1 &
 tail -f ~/meshcore.log
 ```
 
@@ -325,7 +283,7 @@ The first command starts the application in the background and writes all output
 Runs entirely in the background. Your terminal is free and the application survives closing your SSH session. Ideal for headless devices where you start the application once and leave it running.
 
 ```bash
-nohup python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on > ~/meshcore.log 2>&1 &
+nohup python meshcore_gui.py /dev/ttyUSB0 --debug-on > ~/meshcore.log 2>&1 &
 ```
 
 To check if it is running:
@@ -354,12 +312,7 @@ A systemd service starts automatically on boot, restarts on crashes, and integra
 
 #### 7.5.1. Automated Setup
 
-The included install script auto-detects your username, project directory and Python venv path, then creates and enables the service. It also installs the D-Bus policy for BLE PIN pairing.
-
-```bash
-cd ~/meshcore-gui
-BLE_ADDRESS=AA:BB:CC:DD:EE:FF bash install_ble_stable.sh
-```
+The included `install_ble_stable.sh` script is BLE-specific and not used for serial setups. Use the manual setup below.
 
 #### 7.5.2. Manual Setup
 
@@ -371,24 +324,20 @@ sudo nano /etc/systemd/system/meshcore-gui.service
 
 ```ini
 [Unit]
-Description=MeshCore GUI (BLE)
-After=bluetooth.target
-Wants=bluetooth.target
+Description=MeshCore GUI (Serial)
 
 [Service]
 Type=simple
 User=your-username
 WorkingDirectory=/home/your-username/meshcore-gui
-ExecStart=/home/your-username/meshcore-gui/venv/bin/python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on --port=8081 --ble-pin=123456
+ExecStart=/home/your-username/meshcore-gui/venv/bin/python meshcore_gui.py /dev/ttyUSB0 --debug-on --port=8081 --baud=115200
 Restart=on-failure
 RestartSec=30
-Environment=DBUS_SYSTEM_BUS_ADDRESS=unix:path=/var/run/dbus/system_bus_socket
-
 [Install]
 WantedBy=multi-user.target
 ```
 
-Replace `your-username`, `AA:BB:CC:DD:EE:FF`, port and PIN with your actual values. Bond cleanup and PIN pairing are handled automatically by the built-in agent — no `ExecStartPre` or `bt-agent` dependency needed.
+Replace `your-username`, `/dev/ttyUSB0` and port with your actual values.
 
 **Step 2 — Enable and start:**
 
@@ -430,11 +379,11 @@ For example: `http://raspberrypi5nas:8081` or `http://192.168.2.234:8081`. This 
 You can run multiple instances simultaneously (e.g. for different MeshCore devices) by assigning each a different port:
 
 ```bash
-python meshcore_gui.py AA:BB:CC:DD:EE:FF --port=8081 --ble-pin=123456 &
-python meshcore_gui.py 11:22:33:44:55:66 --port=8082 --ble-pin=654321 &
+python meshcore_gui.py /dev/ttyUSB0 --port=8081 --baud=115200 &
+python meshcore_gui.py /dev/ttyUSB1 --port=8082 --baud=115200 &
 ```
 
-Each instance gets its own log file, cache and archive, all keyed by the BLE address.
+Each instance gets its own log file, cache and archive, all keyed by the device identifier (serial port).
 
 ### 7.8. Migrating Existing Data
 
@@ -448,19 +397,13 @@ scp -r ~/.meshcore-gui user@headless-device:~/
 
 The Raspberry Pi 5 is a good fit for running MeshCore GUI headless:
 
-- **BLE**: Built-in Bluetooth 5.0/BLE — no USB dongle required
+- **Serial**: USB serial adapter or direct USB connection to the device
 - **RAM**: 2 GB is sufficient; 4 GB or more provides extra headroom for long-running operation
 - **OS**: Raspberry Pi OS Lite (64-bit, Bookworm) — no desktop environment needed
 - **Storage**: 16 GB+ SD card or NVMe; the application stores cache and archive data in `~/.meshcore-gui/`
 - **Power**: Low idle power consumption (~5W), suitable for 24/7 operation
 
-Make sure your user is in the `bluetooth` group:
-
-```bash
-sudo usermod -aG bluetooth $USER
-```
-
-If your MeshCore device has BLE PIN pairing enabled, make sure the D-Bus policy file is installed (see step 5 under Installation, or use `install_ble_stable.sh`). The built-in PIN agent handles pairing automatically.
+Ensure your user has permission to access the serial device (e.g. member of `dialout` on many Linux distros).
 
 ## 8. Configuration
 
@@ -471,8 +414,11 @@ If your MeshCore device has BLE PIN pairing enabled, make sure the D-Bus policy 
 | `DEBUG` | `meshcore_gui/config.py` | Set to `True` for verbose logging (or use `--debug-on`) |
 | `MAX_CHANNELS` | `meshcore_gui/config.py` | Maximum channel slots to probe on device (default: 8) |
 | `CHANNEL_CACHE_ENABLED` | `meshcore_gui/config.py` | Cache discovered channels to disk for faster startup (default: `False` — always fresh from device) |
-| `BLE_PIN` | `meshcore_gui/config.py` | BLE pairing PIN for the MeshCore device (default: `123456`). Override at startup with `--ble-pin=PIN` |
-| `RECONNECT_MAX_RETRIES` | `meshcore_gui/config.py` | Maximum reconnect attempts after a BLE disconnect (default: 5) |
+| `DEFAULT_TIMEOUT` | `meshcore_gui/config.py` | Default command timeout in seconds (default: `10.0`) |
+| `MESHCORE_LIB_DEBUG` | `meshcore_gui/config.py` | Enable meshcore library debug logging (default: `True`) |
+| `SERIAL_BAUDRATE` | `meshcore_gui/config.py` | Serial baudrate (default: `115200`) |
+| `SERIAL_CX_DELAY` | `meshcore_gui/config.py` | Serial connection delay (default: `0.1`) |
+| `RECONNECT_MAX_RETRIES` | `meshcore_gui/config.py` | Maximum reconnect attempts after a disconnect (default: 5) |
 | `RECONNECT_BASE_DELAY` | `meshcore_gui/config.py` | Base delay in seconds between reconnect attempts, multiplied by attempt number (default: 5.0) |
 | `CONTACT_REFRESH_SECONDS` | `meshcore_gui/config.py` | Interval between periodic contact refreshes (default: 300s / 5 minutes) |
 | `MESSAGE_RETENTION_DAYS` | `meshcore_gui/config.py` | Retention period for archived messages (default: 30 days) |
@@ -484,9 +430,10 @@ If your MeshCore device has BLE PIN pairing enabled, make sure the D-Bus policy 
 | `BOT_COOLDOWN_SECONDS` | `meshcore_gui/services/bot.py` | Minimum seconds between bot replies |
 | `BOT_KEYWORDS` | `meshcore_gui/services/bot.py` | Keyword → reply template mapping |
 | Room passwords | `~/.meshcore-gui/room_passwords/<ADDRESS>.json` | Per-device Room Server passwords (managed via GUI, stored outside repository) |
-| BLE Address | CLI argument | Device MAC address (or UUID on macOS) |
+| Serial Port | CLI argument | Device serial port (e.g. `/dev/ttyUSB0` or `COM3`) |
 | `--port=PORT` | CLI flag | Web server port (default: `8081`) |
-| `--ble-pin=PIN` | CLI flag | BLE pairing PIN override (default: `123456`) |
+| `--baud=BAUD` | CLI flag | Serial baudrate (default: `115200`) |
+| `--serial-cx-dly=SECONDS` | CLI flag | Serial connection delay (default: `0.1`) |
 | `--debug-on` | CLI flag | Enable verbose debug logging |
 
 ## 9. Functionality
@@ -562,7 +509,7 @@ Room Servers (type=3 contacts) allow group-style messaging via a shared server n
 
 ### 9.8. Message Archive
 
-All incoming messages and RX log entries are automatically persisted to disk in `~/.meshcore-gui/archive/`. One JSON file per data type per BLE device address.
+All incoming messages and RX log entries are automatically persisted to disk in `~/.meshcore-gui/archive/`. One JSON file per data type per device identifier.
 
 Click the **📚 Archive** button in the Messages panel header to open the archive viewer in a new tab. The archive viewer provides:
 
@@ -577,30 +524,28 @@ Old data is automatically cleaned up based on configurable retention periods (`M
 
 ### 9.9. Local Cache
 
-Device info, contacts and channel keys are automatically cached to disk in `~/.meshcore-gui/cache/`. One JSON file is created per BLE device address.
+Device info, contacts and channel keys are automatically cached to disk in `~/.meshcore-gui/cache/`. One JSON file is created per device identifier.
 
 **Startup behaviour:**
 1. Cache is loaded first — GUI is immediately populated with the last known state
-2. BLE connection is established in the background
+2. Serial connection is established in the background
 3. Fresh data from the device updates both the GUI and the cache
 
 **Channel key loading:**
 
-Channel key loading uses a cache-first strategy with BLE fallback:
+Channel key loading uses a cache-first strategy with device fallback:
 
 1. Cached keys are loaded first and never overwritten by name-derived fallbacks
 2. Each channel is queried from the device at startup
 3. Channels that fail are retried in the background every 30 seconds
 4. Successfully loaded keys are immediately written to the cache for next startup
 
-> **Note:** Prior to v5.6.0, BLE commands frequently timed out due to a race condition in the meshcore SDK. The patched SDK resolves this — see [11. Known Limitations](#11-known-limitations) for installation instructions. Since v5.7.0, channels are discovered dynamically from the device, eliminating the need for manual `CHANNELS_CONFIG` setup.
-
 **Contact merge strategy:**
 - New contacts from the device are added to the cache with a `last_seen` timestamp
 - Existing contacts are updated (fresh data wins)
 - Contacts only in cache (node offline) are preserved
 
-If BLE connection fails, the GUI remains usable with cached data and shows an offline status.
+If the serial connection fails, the GUI remains usable with cached data and shows an offline status.
 
 ### 9.10. Keyword Bot
 
@@ -639,11 +584,11 @@ The built-in bot automatically replies to messages containing recognised keyword
 
 ```
 ┌─────────────────┐     ┌─────────────────┐
-│   Main Thread   │     │   BLE Thread    │
+│   Main Thread   │     │  Serial Thread  │
 │   (NiceGUI)     │     │   (asyncio)     │
 │                 │     │                 │
 │  ┌───────────┐  │     │  ┌───────────┐  │
-│  │ Dashboard │◄─┼──┬──┼─►│ BLEWorker │  │
+│  │ Dashboard │◄─┼──┬──┼─►│ SerialWorker│ │
 │  └───────────┘  │  │  │  └─────┬─────┘  │
 │        │        │  │  │        │        │
 │        ▼        │  │  │   ┌────┴────┐   │
@@ -658,8 +603,8 @@ The built-in bot automatically replies to messages containing recognised keyword
 │  │ ArchivePg │  │  │  │   │  Cache  │   │
 │  │ RoomSrvPnl│  │  │  │   └─────────┘   │
 │  └───────────┘  │  │  │   ┌─────────┐   │
-│                 │  │  │   │BleAgent │   │
 │                 │  │  │   │Reconnect│   │
+│                 │  │  │   │  Loop   │   │
 │                 │  │  │   └─────────┘   │
 └─────────────────┘  │  └─────────────────┘
               ┌──────┴──────┐
@@ -677,11 +622,9 @@ The built-in bot automatically replies to messages containing recognised keyword
               └─────────────┘     └───────────────┘
 ```
 
-- **BLEWorker**: Runs in separate thread with its own asyncio loop, with built-in PIN agent, automatic bond cleanup, disconnect detection, auto-reconnect and background retry for missing channel keys
-- **BleAgentManager**: Built-in D-Bus PIN agent that registers with BlueZ and handles pairing requests automatically (replaces external `bt-agent.service`)
-- **reconnect_loop**: Bond cleanup via D-Bus + reconnect with linear backoff after disconnect (replaces manual `bluetoothctl remove`)
+- **SerialWorker**: Runs in separate thread with its own asyncio loop, disconnect detection, auto-reconnect and background retry for missing channel keys
 - **CommandHandler**: Executes commands (send message, advert, refresh, purge unpinned, set auto-add, set bot name, restore name, login room, send room msg, remove single contact)
-- **EventHandler**: Processes incoming BLE events (messages, RX log) with path hash caching between RX_LOG and fallback handlers, and resolves repeater names at receive time for self-contained archive data
+- **EventHandler**: Processes incoming device events (messages, RX log) with path hash caching between RX_LOG and fallback handlers, and resolves repeater names at receive time for self-contained archive data
 - **PacketDecoder**: Decodes raw LoRa packets and extracts route data
 - **MeshBot**: Keyword-triggered auto-reply on configured channels with automatic device name switching
 - **DualDeduplicator**: Prevents duplicate messages (hash-based + content-based)
@@ -691,44 +634,42 @@ The built-in bot automatically replies to messages containing recognised keyword
 - **ContactCleanerService**: Bulk-delete logic for unpinned contacts with statistics
 - **RoomServerPanel**: Per-room-server card management with login/logout, message display and send functionality
 - **RoomPasswordStore**: Persistent Room Server password storage per device in `~/.meshcore-gui/room_passwords/` (JSON-backed, analogous to PinStore)
-- **SharedData**: Thread-safe data sharing between BLE and GUI via Protocol interfaces
+- **SharedData**: Thread-safe data sharing between serial worker and GUI via Protocol interfaces
 - **DashboardPage**: Main GUI with modular panels (device, contacts, map, messages, etc.)
 - **RoutePage**: Standalone route visualization page opened per message
 - **ArchivePage**: Archive viewer with filters, pagination and inline route tables
-- **Communication**: Via command queue (GUI→BLE) and shared state with flags (BLE→GUI)
+- **Communication**: Via command queue (GUI→worker) and shared state with flags (worker→GUI)
 
 ## 11. Known Limitations
 
-1. **Channel discovery timing** — Dynamic channel discovery probes the device at startup; on very slow BLE connections, some channels may be missed on first attempt. Channels are retried in the background and cached for subsequent startups when `CHANNEL_CACHE_ENABLED = True`
-2. **BLE command reliability** — Resolved in v5.6.0. The meshcore SDK previously had a race condition where device responses were missed. The patched SDK ([PR #52](https://github.com/meshcore-dev/meshcore_py/pull/52)) uses subscribe-before-send to eliminate this. Until merged upstream, install the patched version: `pip install --force-reinstall git+https://github.com/PE1HVH/meshcore_py.git@fix/event-race-condition`
-3. **Initial load time** — GUI waits for BLE data before the first render is complete (mitigated by cache: if cached data exists, the GUI populates instantly)
-4. **Archive route map visualization** — Route table names and IDs are now stored at receive time and display correctly regardless of current contacts. However, the route *map* still depends on GPS coordinates from contacts currently in memory; archived messages without recent contact data may show incomplete map markers
+1. **Channel discovery timing** — Dynamic channel discovery probes the device at startup; on very slow serial links, some channels may be missed on first attempt. Channels are retried in the background and cached for subsequent startups when `CHANNEL_CACHE_ENABLED = True`
+2. **Initial load time** — GUI waits for device data before the first render is complete (mitigated by cache: if cached data exists, the GUI populates instantly)
+3. **Archive route map visualization** — Route table names and IDs are now stored at receive time and display correctly regardless of current contacts. However, the route *map* still depends on GPS coordinates from contacts currently in memory; archived messages without recent contact data may show incomplete map markers
 <!-- CHANGED: Partially resolved in v1.7.1 — route table self-contained, map still depends on live GPS -->
-5. **Room Server message latency** — Room Server messages travel over LoRa RF and arrive asynchronously (10–75 seconds per message). With many logged-in clients, receiving all historical messages can take 10+ minutes due to the round-robin push protocol
+4. **Room Server message latency** — Room Server messages travel over LoRa RF and arrive asynchronously (10–75 seconds per message). With many logged-in clients, receiving all historical messages can take 10+ minutes due to the round-robin push protocol
 
 ## 12. Troubleshooting
 
 ### 12.1. Linux
 
-For comprehensive Linux BLE troubleshooting (including the `EOFError` / `start_notify` issue), see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+For Linux serial troubleshooting, start by checking device permissions and that the correct serial port is selected.
 
 #### 12.1.1. Quick Fixes
 
-##### GUI remains empty / BLE connection fails
+##### GUI remains empty / serial connection fails
 
 1. Check the service logs:
    ```bash
    journalctl -u meshcore-gui -n 50 --no-pager
    ```
-2. The built-in PIN agent should handle pairing automatically. If you see D-Bus permission errors, ensure the policy file is installed:
+2. Confirm the serial device exists and is readable:
    ```bash
-   ls /etc/dbus-1/system.d/meshcore-ble.conf
+   ls -l /dev/serial/by-id
    ```
-   If missing, run `install_ble_stable.sh` or create it manually (see step 5 under Installation).
-3. If bond state is corrupted, manually remove and restart:
+3. Ensure your user has serial permissions (commonly `dialout` on Linux):
    ```bash
-   bluetoothctl remove AA:BB:CC:DD:EE:FF
-   sudo systemctl restart meshcore-gui
+   sudo usermod -a -G dialout $USER
+   # Log out and back in
    ```
 4. Kill any existing GUI instance and free the port:
    ```bash
@@ -737,32 +678,24 @@ For comprehensive Linux BLE troubleshooting (including the `EOFError` / `start_n
    ```
 5. Restart the GUI:
    ```bash
-   python meshcore_gui.py AA:BB:CC:DD:EE:FF
+   python meshcore_gui.py /dev/ttyUSB0
    ```
-
-##### Bluetooth permissions
-
-```bash
-sudo usermod -a -G bluetooth $USER
-# Log out and back in
-```
 
 ### 12.2. macOS
 
-- Make sure Bluetooth is enabled in System Settings
-- Grant your terminal app Bluetooth access when prompted
-- Use the UUID address from BleakScanner, not a MAC address
+- Ensure the device shows up under `/dev/tty.usb*`, `/dev/tty.usbserial*`, or `/dev/tty.usbmodem*`
+- Close any other app that might be using the serial port
 
 ### 12.3. Windows
 
-- Make sure Bluetooth is enabled in Settings → Bluetooth & devices
-- Run the terminal as a regular user (not as Administrator — WinRT BLE can behave unexpectedly with elevated privileges)
+- Confirm the COM port in Device Manager → Ports (COM & LPT)
+- Close any other app that might be using the COM port
 
 ### 12.4. All Platforms
 
 #### 12.4.1. Device Not Found
 
-Make sure the MeshCore device is powered on and in BLE Companion mode. Run the BleakScanner script from the Usage section to verify it is visible.
+Make sure the MeshCore device is powered on, running Serial Companion firmware, and the correct serial port is selected.
 
 #### 12.4.2. Messages Not Arriving
 
@@ -777,7 +710,7 @@ If cached data causes issues (e.g. stale contacts), delete the cache file:
 rm ~/.meshcore-gui/cache/*.json
 ```
 
-The cache will be recreated on the next successful BLE connection.
+The cache will be recreated on the next successful serial connection.
 
 ## 13. Development
 
@@ -786,7 +719,7 @@ The cache will be recreated on the next successful BLE connection.
 Enable via command line flag:
 
 ```bash
-python meshcore_gui.py AA:BB:CC:DD:EE:FF --debug-on
+python meshcore_gui.py /dev/ttyUSB0 --debug-on
 ```
 
 Or set `DEBUG = True` in `meshcore_gui/config.py`.
@@ -800,16 +733,16 @@ Debug output is written to both stdout and a per-device rotating log file at `~/
 ```
 meshcore-gui/
 ├── meshcore_gui.py                  # Entry point
-├── install_ble_stable.sh            # Automated installer (systemd, D-Bus policy, path detection)
+├── install_ble_stable.sh            # Automated installer (systemd, path detection)
 ├── meshcore_gui/                    # Application package
 │   ├── __init__.py
 │   ├── __main__.py                  # Alternative entry: python -m meshcore_gui
-│   ├── config.py                    # OPERATOR_CALLSIGN, LANDING_SVG_PATH, DEBUG flag, channel discovery settings (MAX_CHANNELS, CHANNEL_CACHE_ENABLED), BLE_PIN, RECONNECT_* settings, refresh interval, retention settings, BOT_DEVICE_NAME, per-device log file naming
-│   ├── ble/                         # BLE communication layer
+│   ├── config.py                    # OPERATOR_CALLSIGN, LANDING_SVG_PATH, DEBUG flag, channel discovery settings (MAX_CHANNELS, CHANNEL_CACHE_ENABLED), SERIAL_* defaults, RECONNECT_* settings, refresh interval, retention settings, BOT_DEVICE_NAME, per-device log file naming
+│   ├── ble/                         # Connection layer (serial transport)
 │   │   ├── __init__.py
-│   │   ├── worker.py                # BLE thread, connection lifecycle, cache-first startup, disconnect detection, auto-reconnect, background key retry
-│   │   ├── ble_agent.py             # Built-in BlueZ D-Bus PIN agent (replaces bt-agent.service)
-│   │   ├── ble_reconnect.py         # Bond cleanup via D-Bus + reconnect loop with linear backoff
+│   │   ├── worker.py                # Serial thread, connection lifecycle, cache-first startup, disconnect detection, auto-reconnect, background key retry
+│   │   ├── ble_agent.py             # Legacy BLE agent (unused in serial mode)
+│   │   ├── ble_reconnect.py         # Legacy BLE reconnect (unused in serial mode)
 │   │   ├── commands.py              # Command execution (send, refresh, advert)
 │   │   ├── events.py                # Event callbacks (messages, RX log) with path hash caching and name resolution at receive time
 │   │   └── packet_decoder.py        # Raw LoRa packet decoding via meshcoredecoder
@@ -838,7 +771,7 @@ meshcore-gui/
 │   └── services/                    # Business logic
 │       ├── __init__.py
 │       ├── bot.py                   # Keyword-triggered auto-reply bot
-│       ├── cache.py                 # Local JSON cache per BLE device
+│       ├── cache.py                 # Local JSON cache per device
 │       ├── contact_cleaner.py       # Bulk-delete logic for unpinned contacts
 │       ├── dedup.py                 # Message deduplication
 │       ├── message_archive.py       # Persistent message and RX log archive
@@ -846,7 +779,7 @@ meshcore-gui/
 │       ├── room_password_store.py   # Persistent Room Server password storage per device
 │       └── route_builder.py         # Route data construction
 ├── docs/
-│   ├── TROUBLESHOOTING.md           # BLE troubleshooting guide (Linux)
+│   ├── TROUBLESHOOTING.md           # BLE troubleshooting guide (legacy)
 │   ├── MeshCore_GUI_Design.docx     # Design document
 │   ├── ble_capture_workflow_t_1000_e_explanation.md
 │   └── ble_capture_workflow_t_1000_e_uitleg.md
@@ -869,7 +802,7 @@ Have a feature request or want to contribute? Open an issue or submit a pull req
 
 ## 15. Disclaimer
 
-This is an **independent community project** and is not affiliated with or endorsed by the official [MeshCore](https://github.com/meshcore-dev) development team. It is built on top of the open-source `meshcore` Python library and `bleak` BLE library.
+This is an **independent community project** and is not affiliated with or endorsed by the official [MeshCore](https://github.com/meshcore-dev) development team. It is built on top of the open-source `meshcore` Python library.
 
 ## 16. License
 
@@ -886,4 +819,3 @@ MIT License - see LICENSE file
 - [meshcore-cli](https://github.com/meshcore-dev/meshcore-cli) — Command line interface
 - [meshcoredecoder](https://github.com/meshcore-dev/meshcoredecoder) — LoRa packet decoder and channel crypto
 - [NiceGUI](https://nicegui.io/) — Python GUI framework
-- [Bleak](https://github.com/hbldh/bleak) — Cross-platform Bluetooth Low Energy library

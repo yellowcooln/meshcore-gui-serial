@@ -1,4 +1,6 @@
-# MeshCore GUI — BLE Stabiliteit: Installatie-instructies
+# MeshCore GUI — BLE Stabiliteit: Installatie-instructies (Legacy)
+
+> **Let op:** Dit document is BLE-specifiek en wordt bewaard als referentie. De huidige GUI gebruikt USB-serieel; gebruik het handmatige systeemd-voorbeeld in de README.
 
 ## Wat is gewijzigd
 

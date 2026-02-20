@@ -1,5 +1,5 @@
 """
-BLE communication worker for MeshCore GUI.
+Serial communication worker for MeshCore GUI.
 
 Runs in a separate thread with its own asyncio event loop.  Connects
 to the MeshCore device, wires up collaborators, and runs the command
@@ -7,33 +7,21 @@ processing loop.
 
 Responsibilities deliberately kept narrow (SRP):
     - Thread lifecycle and asyncio loop
-    - BLE connection and initial data loading
+    - Serial connection and initial data loading
     - Wiring CommandHandler and EventHandler
-    - PIN pairing via built-in D-Bus agent
     - Disconnect detection and automatic reconnect
 
 Command execution  → :mod:`meshcore_gui.ble.commands`
 Event handling     → :mod:`meshcore_gui.ble.events`
 Packet decoding    → :mod:`meshcore_gui.ble.packet_decoder`
-PIN agent          → :mod:`meshcore_gui.ble.ble_agent`
-Reconnect logic    → :mod:`meshcore_gui.ble.ble_reconnect`
 Bot logic          → :mod:`meshcore_gui.services.bot`
 Deduplication      → :mod:`meshcore_gui.services.dedup`
 Cache              → :mod:`meshcore_gui.services.cache`
 
-v5.2 changes (BLE stability)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Built-in D-Bus PIN agent: eliminates ``bt-agent.service``.
-- Automatic bond removal on startup (clean slate).
-- Disconnect detection in the main loop with auto-reconnect.
-- Bond cleanup before each reconnect attempt (fixes "PIN or Key
-  Missing" errors from stale BlueZ bonds).
-- Linear backoff reconnect (configurable via ``RECONNECT_*`` settings).
-
 v5.1 changes
 ~~~~~~~~~~~~~
 - Cache-first startup: GUI is populated instantly from disk cache.
-- Background BLE refresh updates cache + SharedData incrementally.
+- Background refresh updates cache + SharedData incrementally.
 - Periodic contact refresh every ``CONTACT_REFRESH_SECONDS``.
 - Channel keys are cached to disk for instant packet decoding.
 - Background key retry: missing channel keys are retried every
@@ -47,22 +35,21 @@ from typing import Dict, List, Optional, Set
 
 from meshcore import MeshCore, EventType
 
-import meshcore_gui.config as _config
 from meshcore_gui.config import (
-    BLE_DEFAULT_TIMEOUT,
-    BLE_LIB_DEBUG,
+    DEFAULT_TIMEOUT,
+    MESHCORE_LIB_DEBUG,
     CHANNEL_CACHE_ENABLED,
     CONTACT_REFRESH_SECONDS,
     MAX_CHANNELS,
     RECONNECT_BASE_DELAY,
     RECONNECT_MAX_RETRIES,
+    SERIAL_BAUDRATE,
+    SERIAL_CX_DELAY,
     debug_data,
     debug_print,
     pp,
 )
 from meshcore_gui.core.protocols import SharedDataWriter
-from meshcore_gui.ble.ble_agent import BleAgentManager
-from meshcore_gui.ble.ble_reconnect import reconnect_loop, remove_bond
 from meshcore_gui.ble.commands import CommandHandler
 from meshcore_gui.ble.events import EventHandler
 from meshcore_gui.ble.packet_decoder import PacketDecoder
@@ -78,26 +65,33 @@ KEY_RETRY_INTERVAL: float = 30.0
 CLEANUP_INTERVAL: float = 86400.0
 
 
-class BLEWorker:
-    """BLE communication worker that runs in a separate thread.
+class SerialWorker:
+    """Serial communication worker that runs in a separate thread.
 
     Args:
-        address: BLE MAC address (e.g. ``"literal:AA:BB:CC:DD:EE:FF"``).
+        port:   Serial device path (e.g. ``"/dev/ttyUSB0"``).
+        baudrate: Serial baudrate (default 115200).
+        cx_dly: Connection delay used by meshcore serial transport.
         shared:  SharedDataWriter for thread-safe communication.
     """
 
-    def __init__(self, address: str, shared: SharedDataWriter) -> None:
-        self.address = address
+    def __init__(
+        self,
+        port: str,
+        shared: SharedDataWriter,
+        baudrate: int = SERIAL_BAUDRATE,
+        cx_dly: float = SERIAL_CX_DELAY,
+    ) -> None:
+        self.port = port
+        self.baudrate = baudrate
+        self.cx_dly = cx_dly
         self.shared = shared
         self.mc: Optional[MeshCore] = None
         self.running = True
         self._disconnected = False
 
-        # BLE PIN agent (replaces external bt-agent.service)
-        self._agent = BleAgentManager(pin=_config.BLE_PIN)
-
         # Local cache (one file per device)
-        self._cache = DeviceCache(address)
+        self._cache = DeviceCache(port)
 
         # Collaborators (created eagerly, wired after connection)
         self._decoder = PacketDecoder()
@@ -122,20 +116,13 @@ class BLEWorker:
         """Start the worker in a new daemon thread."""
         thread = threading.Thread(target=self._run, daemon=True)
         thread.start()
-        debug_print("BLE worker thread started")
+        debug_print("Serial worker thread started")
 
     def _run(self) -> None:
         asyncio.run(self._async_main())
 
     async def _async_main(self) -> None:
-        # ── Step 1: Start PIN agent (BEFORE any BLE connection) ──
-        await self._agent.start()
-
-        # ── Step 2: Remove stale bond (clean slate) ──
-        await remove_bond(self.address)
-        await asyncio.sleep(1)
-
-        # ── Step 3: Connect + main loop (with reconnect wrapper) ──
+        # ── Step 1: Connect + main loop (with reconnect wrapper) ──
         try:
             while self.running:
                 self._disconnected = False
@@ -143,11 +130,9 @@ class BLEWorker:
 
                 if not self.mc:
                     # Initial connect failed — wait and retry
-                    print("BLE: Initial connection failed, retrying in 30s...")
+                    print("SERIAL: Initial connection failed, retrying in 30s...")
                     self.shared.set_status("⚠️ Connection failed — retrying...")
                     await asyncio.sleep(30)
-                    await remove_bond(self.address)
-                    await asyncio.sleep(1)
                     continue
 
                 # ── Main loop ──
@@ -165,15 +150,18 @@ class BLEWorker:
                             for kw in (
                                 "not connected",
                                 "disconnected",
-                                "dbus",
-                                "pin or key missing",
                                 "connection reset",
                                 "broken pipe",
-                                "failed to discover",
-                                "service discovery",
+                                "serial",
+                                "tty",
+                                "port",
+                                "device",
+                                "i/o",
+                                "read failed",
+                                "write failed",
                             )
                         ):
-                            print(f"BLE: ⚠️  Connection error detected: {e}")
+                            print(f"SERIAL: ⚠️  Connection error detected: {e}")
                             self._disconnected = True
                             break
                         debug_print(f"Command processing error: {e}")
@@ -206,23 +194,9 @@ class BLEWorker:
                     self.shared.set_status(
                         "🔄 Verbinding verloren — herverbinden..."
                     )
-                    print("BLE: Verbinding verloren, start reconnect...")
+                    print("SERIAL: Verbinding verloren, start reconnect...")
                     self.mc = None
-
-                    async def _create_fresh_connection() -> MeshCore:
-                        return await MeshCore.create_ble(
-                            self.address,
-                            auto_reconnect=False,
-                            default_timeout=BLE_DEFAULT_TIMEOUT,
-                            debug=BLE_LIB_DEBUG,
-                        )
-
-                    new_mc = await reconnect_loop(
-                        _create_fresh_connection,
-                        self.address,
-                        max_retries=RECONNECT_MAX_RETRIES,
-                        base_delay=RECONNECT_BASE_DELAY,
-                    )
+                    new_mc = await self._reconnect_serial()
 
                     if new_mc:
                         self.mc = new_mc
@@ -268,40 +242,72 @@ class BLEWorker:
                         self._seed_dedup_from_messages()
                         self.shared.set_connected(True)
                         self.shared.set_status("✅ Herverbonden")
-                        print("BLE: ✅ Herverbonden en operationeel")
+                        print("SERIAL: ✅ Herverbonden en operationeel")
                     else:
                         self.shared.set_status(
                             "❌ Herverbinding mislukt — herstart nodig"
                         )
                         print(
-                            "BLE: ❌ Kan niet herverbinden — "
+                            "SERIAL: ❌ Kan niet herverbinden — "
                             "wacht 60s en probeer opnieuw..."
                         )
                         await asyncio.sleep(60)
-                        await remove_bond(self.address)
-                        await asyncio.sleep(1)
         finally:
-            # ── Cleanup: stop PIN agent ──
-            await self._agent.stop()
+            return
 
     # ------------------------------------------------------------------
     # Connection (cache-first)
     # ------------------------------------------------------------------
 
+    async def _reconnect_serial(self) -> Optional[MeshCore]:
+        """Attempt to reconnect to the serial device with linear backoff."""
+        for attempt in range(1, RECONNECT_MAX_RETRIES + 1):
+            delay = RECONNECT_BASE_DELAY * attempt
+            print(
+                f"SERIAL: 🔄 Reconnect attempt {attempt}/{RECONNECT_MAX_RETRIES} "
+                f"in {delay:.0f}s..."
+            )
+            await asyncio.sleep(delay)
+            try:
+                mc = await MeshCore.create_serial(
+                    self.port,
+                    baudrate=self.baudrate,
+                    auto_reconnect=False,
+                    default_timeout=DEFAULT_TIMEOUT,
+                    debug=MESHCORE_LIB_DEBUG,
+                    cx_dly=self.cx_dly,
+                )
+                if mc is None:
+                    raise RuntimeError("No response from device over serial")
+                return mc
+            except Exception as exc:
+                print(f"SERIAL: ❌ Reconnect attempt {attempt} failed: {exc}")
+        print(f"SERIAL: ❌ Reconnect failed after {RECONNECT_MAX_RETRIES} attempts")
+        return None
+
     async def _connect(self) -> None:
         # Phase 1: Load cache → GUI is instantly populated
         if self._cache.load():
             self._apply_cache()
-            print("BLE: Cache loaded — GUI populated from disk")
+            print("SERIAL: Cache loaded — GUI populated from disk")
         else:
-            print("BLE: No cache found — waiting for BLE data")
+            print("SERIAL: No cache found — waiting for device data")
 
-        # Phase 2: Connect BLE
-        self.shared.set_status(f"🔄 Connecting to {self.address}...")
+        # Phase 2: Connect serial
+        self.shared.set_status(f"🔄 Connecting to {self.port}...")
         try:
-            print(f"BLE: Connecting to {self.address}...")
-            self.mc = await MeshCore.create_ble(self.address, auto_reconnect=False, default_timeout=BLE_DEFAULT_TIMEOUT, debug=BLE_LIB_DEBUG)
-            print("BLE: Connected!")
+            print(f"SERIAL: Connecting to {self.port}...")
+            self.mc = await MeshCore.create_serial(
+                self.port,
+                baudrate=self.baudrate,
+                auto_reconnect=False,
+                default_timeout=DEFAULT_TIMEOUT,
+                debug=MESHCORE_LIB_DEBUG,
+                cx_dly=self.cx_dly,
+            )
+            if self.mc is None:
+                raise RuntimeError("No response from device over serial")
+            print("SERIAL: Connected!")
 
             await asyncio.sleep(1)
             debug_print("Post-connection sleep done, wiring collaborators")
@@ -328,7 +334,7 @@ class BLEWorker:
 
             self.shared.set_connected(True)
             self.shared.set_status("✅ Connected")
-            print("BLE: Ready!")
+            print("SERIAL: Ready!")
 
             if self._pending_keys:
                 pending_names = [
@@ -337,13 +343,13 @@ class BLEWorker:
                     if ch['idx'] in self._pending_keys
                 ]
                 print(
-                    f"BLE: ⏳ Background retry active for: "
+                    f"SERIAL: ⏳ Background retry active for: "
                     f"{', '.join(pending_names)} "
                     f"(every {KEY_RETRY_INTERVAL:.0f}s)"
                 )
 
         except Exception as e:
-            print(f"BLE: Connection error: {e}")
+            print(f"SERIAL: Connection error: {e}")
             if self._cache.has_cache:
                 self.shared.set_status(f"⚠️ Offline — using cached data ({e})")
             else:
@@ -432,7 +438,7 @@ class BLEWorker:
         if count:
             debug_print(f"Cache → {count} recent messages from archive")
 
-        # Seed deduplicator with archived messages so that BLE events
+        # Seed deduplicator with archived messages so that device events
         # for already-known messages are suppressed on (re)connect.
         self._seed_dedup_from_messages()
 
@@ -449,7 +455,7 @@ class BLEWorker:
         internally and stores the result in ``self.mc.self_info``.  We reuse
         that instead of sending a duplicate command that is likely to fail
         on a busy mesh network.  Only ``send_device_query`` needs a fresh
-        BLE round-trip.
+        device round-trip.
         """
         # ----------------------------------------------------------
         # send_appstart — reuse result from MeshCore.connect()
@@ -458,7 +464,7 @@ class BLEWorker:
 
         cached_info = self.mc.self_info  # Filled by connect() → send_appstart()
         if cached_info and cached_info.get("name"):
-            print(f"BLE: send_appstart OK (from connect): {cached_info.get('name')}")
+            print(f"SERIAL: send_appstart OK (from connect): {cached_info.get('name')}")
             self.shared.update_from_appstart(cached_info)
             self._cache.set_device(cached_info)
         else:
@@ -479,7 +485,7 @@ class BLEWorker:
                         continue
                     if r.type != EventType.ERROR:
                         print(
-                            f"BLE: send_appstart OK: {r.payload.get('name')} "
+                            f"SERIAL: send_appstart OK: {r.payload.get('name')} "
                             f"(fallback attempt {i + 1})"
                         )
                         self.shared.update_from_appstart(r.payload)
@@ -496,7 +502,7 @@ class BLEWorker:
                 await asyncio.sleep(2.0)
 
             if not appstart_ok:
-                print("BLE: ⚠️  send_appstart failed after 3 fallback attempts")
+                print("SERIAL: ⚠️  send_appstart failed after 3 fallback attempts")
 
         # ----------------------------------------------------------
         # send_device_query — no internal cache, must query device
@@ -516,7 +522,7 @@ class BLEWorker:
                     continue
                 if r.type != EventType.ERROR:
                     fw = r.payload.get("ver", "")
-                    print(f"BLE: send_device_query OK: {fw} (attempt {i + 1})")
+                    print(f"SERIAL: send_device_query OK: {fw} (attempt {i + 1})")
                     self.shared.update_from_device_query(r.payload)
                     if fw:
                         self._cache.set_firmware_version(fw)
@@ -541,29 +547,52 @@ class BLEWorker:
         self.shared.set_status("🔄 Contacts...")
         debug_print("get_contacts starting")
         try:
-            r = await self.mc.commands.get_contacts()
+            r = await self._get_contacts_with_timeout()
             debug_print(f"get_contacts result: type={r.type if r else None}")
             if r and r.payload:
-                debug_data("get_contacts payload", r.payload)
+                try:
+                    payload_len = len(r.payload)
+                except Exception:
+                    payload_len = None
+                if payload_len is not None and payload_len > 10:
+                    debug_print(
+                        f"get_contacts payload size={payload_len} (omitted)"
+                    )
+                else:
+                    debug_data("get_contacts payload", r.payload)
             if r is None:
                 debug_print(
-                    "BLE: get_contacts returned None, "
+                    "SERIAL: get_contacts returned None, "
                     "keeping cached contacts"
                 )
             elif r.type != EventType.ERROR:
                 merged = self._cache.merge_contacts(r.payload)
                 self.shared.set_contacts(merged)
                 print(
-                    f"BLE: Contacts — {len(r.payload)} from device, "
+                    f"SERIAL: Contacts — {len(r.payload)} from device, "
                     f"{len(merged)} total (with cache)"
                 )
             else:
                 debug_print(
-                    "BLE: get_contacts failed — "
+                    "SERIAL: get_contacts failed — "
                     f"payload={pp(r.payload)}, keeping cached contacts"
                 )
         except Exception as exc:
-            debug_print(f"BLE: get_contacts exception: {exc}")
+            debug_print(f"SERIAL: get_contacts exception: {exc}")
+
+    async def _get_contacts_with_timeout(self):
+        """Fetch contacts with a bounded timeout to avoid hanging refresh."""
+        timeout = max(DEFAULT_TIMEOUT * 2, 10.0)
+        try:
+            return await asyncio.wait_for(
+                self.mc.commands.get_contacts(), timeout=timeout
+            )
+        except asyncio.TimeoutError:
+            self.shared.set_status(
+                "⚠️ Contacts timeout — using cached contacts"
+            )
+            debug_print(f"get_contacts timeout after {timeout:.0f}s")
+            return None
 
     # ------------------------------------------------------------------
     # Channel key loading (quick startup + background retry)
@@ -597,7 +626,7 @@ class BLEWorker:
         consecutive_errors = 0
 
         for idx in range(MAX_CHANNELS):
-            # Two attempts per slot to handle transient BLE timeouts,
+            # Two attempts per slot to handle transient timeouts,
             # especially on slower mobile connections.
             payload = await self._try_get_channel_info(
                 idx, max_attempts=2, delay=1.0,
@@ -606,7 +635,7 @@ class BLEWorker:
             if payload is None:
                 consecutive_errors += 1
                 # After 3 consecutive empty slots, assume no more channels.
-                # Raised from 2 to 3: a single BLE hiccup no longer causes
+                # Raised from 2 to 3: a single hiccup no longer causes
                 # the entire discovery to abort prematurely.
                 if consecutive_errors >= 3:
                     debug_print(
@@ -648,26 +677,26 @@ class BLEWorker:
             elif str(idx) in cached_keys:
                 # Cache has the key — use it, don't overwrite
                 from_cache.append(f"[{idx}] {name}")
-                print(f"BLE: 📦 Channel [{idx}] '{name}' — using cached key")
+                print(f"SERIAL: 📦 Channel [{idx}] '{name}' — using cached key")
             else:
                 # No device key, no cache key — derive from name
                 self._decoder.add_channel_key_from_name(idx, name)
                 self._pending_keys.add(idx)
                 derived.append(f"[{idx}] {name}")
                 print(
-                    f"BLE: ⚠️  Channel [{idx}] '{name}' — "
+                    f"SERIAL: ⚠️  Channel [{idx}] '{name}' — "
                     f"name-derived key (will retry)"
                 )
 
-            # Pause between channels to avoid BLE congestion.
-            # Increased from 0.15s to 0.3s: mobile BLE stacks need
+            # Pause between channels to avoid congestion.
+            # Increased from 0.15s to 0.3s: some stacks need
             # more time between consecutive GATT operations.
             await asyncio.sleep(0.3)
 
         # Fallback: if nothing discovered, add Public as default
         if not discovered:
             discovered = [{'idx': 0, 'name': 'Public'}]
-            print("BLE: ⚠️ No channels discovered, using default Public channel")
+            print("SERIAL: ⚠️ No channels discovered, using default Public channel")
 
         # Store discovered channels
         self._channels = discovered
@@ -676,16 +705,16 @@ class BLEWorker:
             self._cache.set_channels(discovered)
             debug_print("Channel list cached to disk")
 
-        print(f"BLE: Channels discovered: {[c['name'] for c in discovered]}")
+        print(f"SERIAL: Channels discovered: {[c['name'] for c in discovered]}")
 
         # Key summary
-        print(f"BLE: PacketDecoder ready — has_keys={self._decoder.has_keys}")
+        print(f"SERIAL: PacketDecoder ready — has_keys={self._decoder.has_keys}")
         if confirmed:
-            print(f"BLE: ✅ Keys from device: {', '.join(confirmed)}")
+            print(f"SERIAL: ✅ Keys from device: {', '.join(confirmed)}")
         if from_cache:
-            print(f"BLE: 📦 Keys from cache: {', '.join(from_cache)}")
+            print(f"SERIAL: 📦 Keys from cache: {', '.join(from_cache)}")
         if derived:
-            print(f"BLE: ⚠️  Name-derived keys: {', '.join(derived)}")
+            print(f"SERIAL: ⚠️  Name-derived keys: {', '.join(derived)}")
 
     async def _try_get_channel_info(
         self,
@@ -757,7 +786,7 @@ class BLEWorker:
             self._decoder.add_channel_key(idx, secret_bytes, source="device")
             self._cache.set_channel_key(idx, secret_bytes.hex())
             print(
-                f"BLE: ✅ Channel [{idx}] '{name}' — "
+                f"SERIAL: ✅ Channel [{idx}] '{name}' — "
                 f"key from device (background retry)"
             )
             self._pending_keys.discard(idx)
@@ -795,7 +824,7 @@ class BLEWorker:
             await asyncio.sleep(1.0)
 
         if not self._pending_keys:
-            print("BLE: ✅ All channel keys now loaded!")
+            print("SERIAL: ✅ All channel keys now loaded!")
         else:
             remaining = [
                 f"[{idx}] {ch_map.get(idx, '?')}"
@@ -810,7 +839,7 @@ class BLEWorker:
     def _seed_dedup_from_messages(self) -> None:
         """Seed the deduplicator with messages already in SharedData.
 
-        Called after archive load so that BLE events carrying the same
+        Called after archive load so that device events carrying the same
         message_hash or content as an already-displayed message are
         correctly suppressed.  This prevents duplicates when the mesh
         device replays pending messages after a (re)connect.
@@ -832,7 +861,7 @@ class BLEWorker:
         """Extract 16-byte secret from various formats.
 
         Handles:
-        - bytes (normal case from BLE)
+        - bytes (normal case from device)
         - hex string (some firmware versions)
 
         Returns 16-byte secret or None if unusable.
@@ -857,7 +886,7 @@ class BLEWorker:
     async def _refresh_contacts(self) -> None:
         """Periodic background contact refresh — merge new/changed."""
         try:
-            r = await self.mc.commands.get_contacts()
+            r = await self._get_contacts_with_timeout()
             if r is None:
                 debug_print("Periodic refresh: get_contacts returned None, skipping")
                 return
@@ -897,4 +926,3 @@ class BLEWorker:
             
         except Exception as exc:
             debug_print(f"Periodic cleanup failed: {exc}")
-

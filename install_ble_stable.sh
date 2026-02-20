@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-# MeshCore GUI — BLE Stability: Installation Script
+# MeshCore GUI — BLE Stability: Installation Script (Legacy)
 # ============================================================================
 #
 # Installs the BLE PIN agent, reconnect module, systemd service
 # and D-Bus policy.  Automatically detects the correct paths and user.
+#
+# NOTE: This script is BLE-specific and is not used for the current
+# serial-based GUI.
 #
 # Usage:
 #   cd ~/meshcore-gui        # (or wherever your project is located)

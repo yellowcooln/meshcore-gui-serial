@@ -25,7 +25,7 @@ from typing import Any, Dict, List
 # ==============================================================================
 
 
-VERSION: str = "1.9.11"
+VERSION: str = "1.10.0"
 
 
 # ==============================================================================
@@ -79,17 +79,23 @@ LOG_DIR: Path = DATA_DIR / "logs"
 LOG_FILE: Path = LOG_DIR / "meshcore_gui.log"
 
 
-def set_log_file_for_device(ble_address: str) -> None:
-    """Set the log file name based on the BLE device address.
+def set_log_file_for_device(device_id: str) -> None:
+    """Set the log file name based on the device identifier.
 
     Transforms ``F0:9E:9E:75:A3:01`` into
-    ``~/.meshcore-gui/logs/F0_9E_9E_75_A3_01_meshcore_gui.log``.
+    ``~/.meshcore-gui/logs/F0_9E_9E_75_A3_01_meshcore_gui.log`` and
+    ``/dev/ttyUSB0`` into ``~/.meshcore-gui/logs/_dev_ttyUSB0_meshcore_gui.log``.
 
     Must be called **before** the first ``debug_print()`` call so the
     lazy logger initialisation picks up the correct path.
     """
     global LOG_FILE
-    safe_name = ble_address.replace(":", "_")
+    safe_name = (
+        device_id
+        .replace("literal:", "")
+        .replace(":", "_")
+        .replace("/", "_")
+    )
     LOG_FILE = LOG_DIR / f"{safe_name}_meshcore_gui.log"
 
 # Maximum size per log file in bytes (5 MB).
@@ -150,12 +156,12 @@ def _init_meshcore_logger() -> None:
 
     The meshcore library uses ``logging.getLogger("meshcore")`` throughout,
     but never attaches a handler.  Without this function all library-level
-    debug output (raw BLE send/receive, event dispatching, command flow)
+    debug output (raw send/receive, event dispatching, command flow)
     is silently dropped because Python's root logger only forwards
     WARNING and above.
 
     Call once at startup (or lazily from ``debug_print``) so that
-    ``BLE_LIB_DEBUG=True`` actually produces visible output.
+    ``MESHCORE_LIB_DEBUG=True`` actually produces visible output.
     """
     LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -212,7 +218,7 @@ def debug_print(msg: str) -> None:
     # Rotating log file
     if _file_logger is None:
         _file_logger = _init_file_logger()
-        # Also wire up the meshcore library logger so BLE_LIB_DEBUG
+        # Also wire up the meshcore library logger so MESHCORE_LIB_DEBUG
         # output actually appears in the same log file + stdout.
         _init_meshcore_logger()
     _file_logger.debug(formatted)
@@ -244,7 +250,7 @@ def debug_data(label: str, obj: Any) -> None:
 
     Output::
 
-        DEBUG [ble.worker]: get_contacts result ↓
+        DEBUG [worker]: get_contacts result ↓
           {
             "name": "PE1HVH",
             "contacts": 629,
@@ -298,20 +304,19 @@ DEVICE_NAME: str = "PE1HVH T1000e"
 # CACHE / REFRESH
 # ==============================================================================
 
-# Default timeout (seconds) for BLE command responses.
+# Default timeout (seconds) for meshcore command responses.
 # Increase if you see frequent 'no_event_received' errors during startup.
-BLE_DEFAULT_TIMEOUT: float = 10.0
+DEFAULT_TIMEOUT: float = 10.0
 
-# Enable debug logging inside the meshcore BLE library itself.
-# When True, raw BLE send/receive data and event parsing are logged.
-BLE_LIB_DEBUG: bool = True
+# Enable debug logging inside the meshcore library itself.
+# When True, raw send/receive data and event parsing are logged.
+MESHCORE_LIB_DEBUG: bool = True
 
-# BLE pairing PIN for the MeshCore device (T1000e default: 123456).
-# Used by the built-in D-Bus agent to answer pairing requests
-# automatically — eliminates the need for bt-agent.service.
-BLE_PIN: str = "123456"
+# Serial connection defaults.
+SERIAL_BAUDRATE: int = 115200
+SERIAL_CX_DELAY: float = 0.1
 
-# Maximum number of reconnect attempts after a BLE disconnect.
+# Maximum number of reconnect attempts after a disconnect.
 RECONNECT_MAX_RETRIES: int = 5
 
 # Base delay in seconds between reconnect attempts (multiplied by
@@ -348,4 +353,3 @@ RXLOG_RETENTION_DAYS: int = 7
 # Retention period for contacts (in days).
 # Contacts not seen for longer than this are removed from cache.
 CONTACT_RETENTION_DAYS: int = 90
-

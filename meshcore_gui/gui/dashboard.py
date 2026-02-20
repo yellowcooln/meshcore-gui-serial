@@ -353,6 +353,8 @@ class DashboardPage:
 
         # Default to dark mode (DOMCA theme)
         dark = ui.dark_mode(True)
+        dark.on_value_change(lambda e: self._map.set_ui_dark_mode(e.value))
+        self._map.set_ui_dark_mode(dark.value)
 
         # ── Left Drawer (must be created before header for Quasar) ────
         self._drawer = ui.left_drawer(value=False, bordered=True).classes(
@@ -641,6 +643,12 @@ class DashboardPage:
         if panel_id == 'archive' and self._archive_page:
             self._archive_page.set_channel_filter(channel)
 
+        # Force map recenter when opening map panel (Leaflet may be hidden on load)
+        if panel_id == 'map' and self._map:
+            data = self._shared.get_snapshot()
+            data['force_center'] = True
+            self._map.update(data)
+
         # Update active menu highlight (standalone buttons only)
         for pid, btn in self._menu_buttons.items():
             if pid == panel_id:
@@ -675,7 +683,7 @@ class DashboardPage:
                 return
 
             # Atomic snapshot + flag clear: eliminates race condition
-            # where BLE worker sets channels_updated between separate
+            # where worker sets channels_updated between separate
             # get_snapshot() and clear_update_flags() calls.
             data = self._shared.get_snapshot_and_clear_flags()
             is_first = not self._initialized
@@ -738,7 +746,7 @@ class DashboardPage:
             if data['rxlog_updated']:
                 self._rxlog.update(data)
 
-            # Signal BLE worker that GUI is ready for data
+            # Signal worker that GUI is ready for data
             if is_first and data['channels'] and data['contacts']:
                 self._shared.mark_gui_initialized()
 

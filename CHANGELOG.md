@@ -8,6 +8,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/) and [Semantic Ver
 
 ---
 
+## [1.10.0] - 2026-02-20 — Serial Connection Default
+
+### Added
+- ✅ **Serial CLI flags** — `--baud=BAUD` and `--serial-cx-dly=SECONDS` for serial configuration at startup.
+
+### Changed
+- 🔄 **Connection layer** — Switched from BLE to serial (`MeshCore.create_serial`) with serial reconnect handling.
+- 🔄 `config.py`: Added `SERIAL_BAUDRATE`, `SERIAL_CX_DELAY`, `DEFAULT_TIMEOUT`, `MESHCORE_LIB_DEBUG`; removed BLE PIN settings; version bumped to `1.10.0`.
+- 🔄 `meshcore_gui.py` / `meshcore_gui/__main__.py`: Updated usage, banners and defaults for serial ports.
+- 🔄 Docs: Updated README and core docs for serial usage; BLE documents marked as legacy.
+
+### Impact
+- **Breaking change:** BLE is no longer used; devices must run Serial Companion firmware and be connected via USB serial.
+
+---
+
 ## [1.9.11] - 2026-02-19 — Message Dedup Hotfix
 
 ### Fixed
